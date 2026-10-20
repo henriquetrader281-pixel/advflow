@@ -166,22 +166,76 @@ def local_draft(subject, fmt, audience, goal):
     "roteiro":[{"cena":"Abertura","fala":f"Você conhece os principais pontos sobre {subject}?","visual":"Apresentador com título na tela"},{"cena":"Explicação","fala":"Vamos organizar as informações de forma clara. A aplicação depende dos fatos e das normas vigentes.","visual":"Palavras-chave"},{"cena":"Cuidados","fala":"Confira documentos, prazos e fontes oficiais antes de tomar decisões.","visual":"Lista curta"},{"cena":"Fechamento","fala":"Conteúdo informativo; não substitui análise individual.","visual":"Assinatura institucional"}] if fmt=="Reel" else [],
     "legenda":f"{subject}: informação jurídica geral. Cada situação deve ser analisada conforme seus fatos e as regras aplicáveis. Este conteúdo não substitui orientação individual.",
     "hashtags":["#Direito","#InformaçãoJurídica"],"fontes_para_conferir":["Legislação oficial aplicável","Portal oficial do tribunal ou órgão competente"]}
+def error_detail(response):
+    try:
+        payload=response.json()
+        if isinstance(payload,dict):
+            err=payload.get("error",payload)
+            if isinstance(err,dict):
+                return str(err.get("message") or err.get("status") or err)[:500]
+            return str(err)[:500]
+    except Exception:
+        pass
+    return (response.text or "sem detalhe fornecido pela API")[:500]
+
+def model_candidates(configured, defaults):
+    clean=(configured or "").strip().strip('"').strip("'")
+    if clean.startswith("models/"):
+        clean=clean[len("models/"):]
+    candidates=[]
+    for item in [clean]+list(defaults):
+        item=(item or "").strip().strip('"').strip("'")
+        if item.startswith("models/"):
+            item=item[len("models/"):]
+        if item and item not in candidates:
+            candidates.append(item)
+    return candidates
+
 def call_gemini(prompt):
     key=secret("GEMINI_API_KEY")
-    if not key: raise RuntimeError("GEMINI_API_KEY não configurada")
-    model=secret("GEMINI_MODEL","gemini-3.8-flash")
-    r=requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",params={"key":key},
-      json={"systemInstruction":{"parts":[{"text":SYSTEM}]},"contents":[{"role":"user","parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}},timeout=60)
-    if not r.ok: raise RuntimeError(f"Gemini HTTP {r.status_code}")
-    return json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+    if not key: raise RuntimeError("GEMINI_API_KEY não configurada nos Secrets do Streamlit")
+    configured=secret("GEMINI_MODEL","gemini-3.8-flash")
+    candidates=model_candidates(configured,["gemini-3.8-flash","gemini-3.7-flash","gemini-3.6-flash","gemini-3.5-flash-lite"])
+    failures=[]
+    for model in candidates:
+        try:
+            r=requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",params={"key":key},
+              json={"systemInstruction":{"parts":[{"text":SYSTEM}]},"contents":[{"role":"user","parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}},timeout=60)
+            if not r.ok:
+                detail=error_detail(r)
+                failures.append(f"{model}: HTTP {r.status_code} ({detail})")
+                if r.status_code in (400,404,422):
+                    continue
+                raise RuntimeError(f"Gemini HTTP {r.status_code}: {detail}")
+            payload=json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+            payload["_modelo_utilizado"]=model
+            return payload
+        except requests.RequestException as exc:
+            failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
+    raise RuntimeError("Nenhum modelo Gemini funcionou. " + " | ".join(failures[:4]))
+
 def call_groq(prompt):
     key=secret("GROQ_API_KEY")
-    if not key: raise RuntimeError("GROQ_API_KEY não configurada")
-    model=secret("GROQ_MODEL","openai/gpt-oss-120b")
-    r=requests.post("https://api.groq.com/openai/v1/chat/completions",headers={"Authorization":"Bearer "+key},
-      json={"model":model,"temperature":0.55,"response_format":{"type":"json_object"},"messages":[{"role":"system","content":SYSTEM},{"role":"user","content":prompt}]},timeout=60)
-    if not r.ok: raise RuntimeError(f"Groq HTTP {r.status_code}")
-    return json.loads(r.json()["choices"][0]["message"]["content"])
+    if not key: raise RuntimeError("GROQ_API_KEY não configurada nos Secrets do Streamlit")
+    configured=secret("GROQ_MODEL","openai/gpt-oss-120b")
+    candidates=model_candidates(configured,["openai/gpt-oss-120b","openai/gpt-oss-20b"])
+    failures=[]
+    for model in candidates:
+        try:
+            r=requests.post("https://api.groq.com/openai/v1/chat/completions",headers={"Authorization":"Bearer "+key},
+              json={"model":model,"temperature":0.55,"response_format":{"type":"json_object"},"messages":[{"role":"system","content":SYSTEM},{"role":"user","content":prompt}]},timeout=60)
+            if not r.ok:
+                detail=error_detail(r)
+                failures.append(f"{model}: HTTP {r.status_code} ({detail})")
+                if r.status_code in (400,404,422):
+                    continue
+                raise RuntimeError(f"Groq HTTP {r.status_code}: {detail}")
+            payload=json.loads(r.json()["choices"][0]["message"]["content"])
+            payload["_modelo_utilizado"]=model
+            return payload
+        except requests.RequestException as exc:
+            failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
+    raise RuntimeError("Nenhum modelo Groq funcionou. " + " | ".join(failures[:3]))
 def generate(subject, fmt, audience, goal, details=""):
     brief=json.dumps({"assunto":subject,"formato":fmt,"publico":audience,"objetivo":goal,"contexto_fontes_e_restricoes":details},ensure_ascii=False)
     errors=[]
@@ -272,6 +326,8 @@ with tabs[1]:
     if "draft" in st.session_state:
         d=st.session_state["draft"]; st.caption("Motor utilizado: "+st.session_state.get("draft_provider",""))
         if d.get("aviso"):st.warning(d["aviso"])
+        if d.get("_modelo_utilizado"):
+            st.caption("Modelo utilizado: "+str(d["_modelo_utilizado"]))
         st.write("**Título:**",d.get("titulo","")); st.write(d.get("resumo_estrategico",""))
         for i,s in enumerate(d.get("slides",[]),1):
             with st.expander(f"{i}. {s.get('titulo','Slide')}"):
