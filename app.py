@@ -66,15 +66,22 @@ def auth_gate():
             st.session_state.pop("auth_user", None)
             username = None
     if account_count == 0:
-        st.info("Primeiro acesso: crie sua conta de administrador. Não é mais necessário definir uma senha global em Secrets.")
+        st.info("Primeiro acesso: configure uma chave de instalação privada em Streamlit Secrets e use-a somente para criar o primeiro administrador.")
+        setup_key_expected=secret("INITIAL_SETUP_KEY")
+        if not setup_key_expected:
+            st.error("Configuração pendente: adicione INITIAL_SETUP_KEY em Settings → Secrets antes de liberar o cadastro inicial. Gere uma chave longa e aleatória e não use o valor de exemplo.")
+            st.stop()
         with st.form("initial_admin_setup"):
+            setup_key = st.text_input("Chave de instalação", type="password")
             new_user = st.text_input("Usuário administrador", placeholder="ex.: henrique.souza")
             pw1 = st.text_input("Crie uma senha", type="password")
             pw2 = st.text_input("Confirme a senha", type="password")
             submitted = st.form_submit_button("Criar administrador", type="primary")
         if submitted:
             clean_user = (new_user or "").strip().lower()
-            if not valid_username(clean_user):
+            if not secrets.compare_digest(setup_key, setup_key_expected):
+                st.error("Chave de instalação inválida.")
+            elif not valid_username(clean_user):
                 st.error("O usuário deve ter de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado.")
             elif len(pw1) < 12:
                 st.error("Use uma senha com pelo menos 12 caracteres.")
@@ -389,6 +396,8 @@ with tabs[4]:
         st.caption("Última atualização nesta sessão: "+st.session_state["news_loaded_at"])
     for err in st.session_state.get("news_errors",[]):
         st.warning(err)
+    if st.session_state.get("news_brief_ready"):
+        st.info("Pauta preparada a partir da notícia. Abra a aba Agente de conteúdo; confira a fonte original antes de gerar/publicar.")
     news_items=st.session_state.get("news_items",[])
     if news_items:
         filtered=[]; needle=norm_news(search_words); cutoff=None
@@ -424,7 +433,8 @@ with tabs[4]:
                         st.session_state["news_brief_subject"]=item["titulo"]
                         st.session_state["news_brief_details"]=f'Notícia: {item["titulo"]}\nFonte: {item["fonte"]}\nData: {item["publicado"]}\nResumo publicado no feed: {item["resumo"]}\nURL original: {item["link"]}\n\nUse a notícia como ponto de partida para uma pauta educativa. Não afirme mudança legal ou tese vinculante sem conferir o documento oficial. Diferencie fato publicado, decisão e interpretação.'
                         st.session_state["brief_version"]=int(st.session_state.get("brief_version",0))+1
-                        st.success("Pauta preparada. Abra a aba Agente de conteúdo para revisar o briefing.")
+                        st.session_state["news_brief_ready"]=True
+                        st.rerun()
     else:
         st.info("Clique em Atualizar radar para consultar as fontes. Depois filtre por área, período ou termo.")
     st.caption("Feeds predefinidos: STJ, CNJ, TSE, Agência Câmara e Migalhas. RSS pode ficar indisponível temporariamente. Sempre confira o inteiro teor de decisões, leis e atos em fonte oficial.")
@@ -508,12 +518,15 @@ if current_user["role"] == "admin":
             selected_user=st.selectbox("Gerenciar conta",choices)
             target=next(r for r in account_rows if r["username"]==selected_user)
             b1,b2,b3=st.columns(3)
-            if b1.button("Redefinir senha",key="reset_user_password"):
+            reset_clicked=b1.button("Redefinir senha",disabled=(selected_user==current_user["username"]),key="reset_user_password")
+            if reset_clicked:
                 temp=secrets.token_urlsafe(12); salt,digest=password_record(temp)
                 with db() as c:
                     c.execute("UPDATE users SET password_salt=?,password_hash=?,must_change_password=1,failed_attempts=0,locked_until=NULL WHERE username=?",(salt,digest,selected_user))
                 st.session_state["temporary_credentials"]={"username":selected_user,"password":temp,"message":"Senha redefinida. Entregue por canal seguro; o usuário deverá trocá-la."}
                 st.rerun()
+            if selected_user==current_user["username"]:
+                st.caption("Para sua própria conta, use a alteração de senha no primeiro acesso ou peça a outro administrador para redefini-la.")
             if target["username"]==current_user["username"]:
                 b2.button("Desativar conta",disabled=True,key="disable_self")
                 b3.button("Reativar conta",disabled=True,key="enable_self")
