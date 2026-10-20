@@ -4,7 +4,8 @@ Aplicação Streamlit para produção de conteúdo informativo, arte tipográfic
 
 ## Acesso e usuários
 
-- No primeiro acesso, crie o administrador na própria tela inicial. Use uma senha forte com pelo menos 12 caracteres.
+- Antes de abrir o app à internet, configure INITIAL_SETUP_KEY em Streamlit Secrets com um valor longo e aleatório privado. Essa chave protege a criação do primeiro administrador e não é a senha normal de login.
+- No primeiro acesso, insira essa chave e crie o administrador na própria tela inicial. Use uma senha forte com pelo menos 12 caracteres.
 - O administrador cria contas adicionais pela aba Usuários. Cada conta tem sua própria senha e vê apenas suas peças, métricas e calendário.
 - Senhas temporárias são geradas pela aplicação e precisam ser alteradas no primeiro acesso. O administrador pode redefinir ou desativar contas.
 - Cinco tentativas de senha incorreta bloqueiam o login por 15 minutos.
