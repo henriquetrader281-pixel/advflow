@@ -267,6 +267,7 @@ with tabs[1]:
                     if source_url: data["fontes_para_conferir"]=list(data.get("fontes_para_conferir",[]))+["Notícia original para revisão: "+source_url]
             st.session_state.pop("news_brief_subject",None)
             st.session_state.pop("news_brief_details",None)
+            st.session_state.pop("news_brief_ready",None)
             st.session_state["draft"]=data; st.session_state["draft_provider"]=provider
     if "draft" in st.session_state:
         d=st.session_state["draft"]; st.caption("Motor utilizado: "+st.session_state.get("draft_provider",""))
