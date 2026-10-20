@@ -1,4 +1,4 @@
-import os, re, json, sqlite3, io, hashlib, secrets, html, unicodedata
+import os, re, json, sqlite3, io, hashlib, secrets, html, unicodedata, zipfile, textwrap
 from datetime import datetime, date, timedelta
 import requests, feedparser, pandas as pd, streamlit as st
 from PIL import Image, ImageDraw, ImageFont
@@ -26,12 +26,12 @@ with db() as c:
         created_at TEXT NOT NULL
     )""")
     c.execute("CREATE TABLE IF NOT EXISTS pieces(id INTEGER PRIMARY KEY, created TEXT, subject TEXT, format TEXT, content TEXT, status TEXT, user_id TEXT NOT NULL DEFAULT 'legacy')")
-    c.execute("CREATE TABLE IF NOT EXISTS metrics(id INTEGER PRIMARY KEY, post_date TEXT, topic TEXT, format TEXT, reach INTEGER, likes INTEGER, comments INTEGER, saves INTEGER, shares INTEGER, user_id TEXT NOT NULL DEFAULT 'legacy')")
+    c.execute("CREATE TABLE IF NOT EXISTS metrics(id INTEGER PRIMARY KEY, post_date TEXT, topic TEXT, format TEXT, reach INTEGER, likes INTEGER, comments INTEGER, saves INTEGER, shares INTEGER, user_id TEXT NOT NULL DEFAULT 'legacy', funnel_stage TEXT NOT NULL DEFAULT 'Descoberta', profile_visits INTEGER NOT NULL DEFAULT 0, link_clicks INTEGER NOT NULL DEFAULT 0)")
     c.execute("CREATE TABLE IF NOT EXISTS calendar(id INTEGER PRIMARY KEY, pub_date TEXT, pub_time TEXT, title TEXT, format TEXT, status TEXT, notes TEXT, user_id TEXT NOT NULL DEFAULT 'legacy')")
     migrations = {
         "users": {"role":"TEXT NOT NULL DEFAULT 'user'","active":"INTEGER NOT NULL DEFAULT 1","must_change_password":"INTEGER NOT NULL DEFAULT 0","failed_attempts":"INTEGER NOT NULL DEFAULT 0","locked_until":"TEXT","created_at":"TEXT"},
         "pieces": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'"},
-        "metrics": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'"},
+        "metrics": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'","funnel_stage":"TEXT NOT NULL DEFAULT 'Descoberta'","profile_visits":"INTEGER NOT NULL DEFAULT 0","link_clicks":"INTEGER NOT NULL DEFAULT 0"},
         "calendar": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'"}
     }
     for table_name, cols in migrations.items():
@@ -144,7 +144,11 @@ def auth_gate():
 current_user = auth_gate()
 user_id = current_user["username"]
 
-SYSTEM = """Você é estrategista de conteúdo jurídico brasileiro. Escreva em português claro, informativo e sóbrio; sem sensacionalismo, promessa de resultado, comparação profissional, captação indevida ou invenção de leis/julgados. Inclua fontes para conferência e aviso de conteúdo informativo. Retorne JSON com titulo, resumo_estrategico, slides (lista de titulo/texto/visual), roteiro (lista de cena/fala/visual), legenda, hashtags e fontes_para_conferir. Carrossel: 6-8 slides; Reel: 4 cenas; Post estático: 1 slide; Legenda: sem slides."""
+SYSTEM = """Você é diretor de criação e estrategista sênior de conteúdo para advocacia brasileira. Produza copy editorial de nível profissional: específica, fluida, persuasiva pelo valor informativo (nunca por pressão comercial), com raciocínio progressivo e linguagem acessível para o público solicitado. Evite clichês, introduções vazias, repetição entre slides, frases genéricas do tipo 'é importante conhecer', perguntas artificiais, promessas de resultado, sensacionalismo, comparação, autoengrandecimento, captação de clientela e estímulo ao litígio. Não invente leis, artigos, prazos, estatísticas, decisões, fatos ou fontes. Quando o contexto estiver incompleto, use formulação condicional e indique o que precisa ser confirmado. O texto deve conter uma ideia concreta por slide, título editorial curto, parágrafo objetivo e transição lógica até a conclusão. Adeque profundidade, vocabulário, exemplos e objeções à área e ao segmento escolhidos. Diferencie informação geral de aconselhamento individual. Respeite a publicidade informativa, sóbria e discreta exigida pela OAB; não use CTA que induza contratação. A etapa de funil define intenção editorial, não uma promessa de conversão comercial.
+
+Retorne JSON válido com as chaves:
+titulo, promessa_editorial, angulo_editorial, publico, area_direito, etapa_funil, resumo_estrategico, gancho, slides (lista de objetos titulo/texto/visual/objetivo_do_slide), roteiro (lista de cena/fala/visual), legenda, cta_educativa, hashtags, fontes_para_conferir, checklist_revisao.
+Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação.""" 
 PATTERNS=[
 (r"garantimos|garantia de resultado|causa ganha|resultado garantido","Possível promessa de resultado."),
 (r"melhor advogado|número\\s*1|líder absoluto|maior escritório","Possível superlativo ou comparação."),
@@ -157,15 +161,92 @@ PATTERNS=[
 def review(text):
     return [msg for pattern,msg in PATTERNS if re.search(pattern,text or "",re.I)] or ["Nenhum termo de alerta foi encontrado pela triagem automática. Isso não garante conformidade com as regras da OAB."]
 
-def local_draft(subject, fmt, audience, goal):
-    titles=["Entenda o tema","O conceito","O que observar","Cuidados importantes","Na prática","Em resumo"]
-    slides=[{"titulo":t,"texto":f"Explique {subject} com linguagem acessível, sem generalizar situações individuais. Confirme regras e prazos em fonte oficial.","visual":"Composição tipográfica institucional"} for t in titles]
-    if fmt=="Post estático": slides=slides[:1]
-    if fmt=="Legenda": slides=[]
-    return {"titulo":subject,"resumo_estrategico":f"Conteúdo para {audience}; objetivo: {goal}. Estrutura-base local para edição e checagem.","slides":slides,
-    "roteiro":[{"cena":"Abertura","fala":f"Você conhece os principais pontos sobre {subject}?","visual":"Apresentador com título na tela"},{"cena":"Explicação","fala":"Vamos organizar as informações de forma clara. A aplicação depende dos fatos e das normas vigentes.","visual":"Palavras-chave"},{"cena":"Cuidados","fala":"Confira documentos, prazos e fontes oficiais antes de tomar decisões.","visual":"Lista curta"},{"cena":"Fechamento","fala":"Conteúdo informativo; não substitui análise individual.","visual":"Assinatura institucional"}] if fmt=="Reel" else [],
-    "legenda":f"{subject}: informação jurídica geral. Cada situação deve ser analisada conforme seus fatos e as regras aplicáveis. Este conteúdo não substitui orientação individual.",
-    "hashtags":["#Direito","#InformaçãoJurídica"],"fontes_para_conferir":["Legislação oficial aplicável","Portal oficial do tribunal ou órgão competente"]}
+FUNNEL_STAGES = [
+    "Descoberta | ampliar alcance qualificado",
+    "Consideração | aprofundar compreensão",
+    "Relacionamento | construir recorrência e confiança",
+    "Conversão editorial | oferecer próximo passo informativo"
+]
+AUDIENCE_OPTIONS = [
+    "Público geral sem formação jurídica",
+    "Consumidores e famílias",
+    "Trabalhadores e profissionais CLT",
+    "Empregadores, RH e gestores",
+    "Microempreendedores e pequenas empresas",
+    "Empresas e departamentos jurídicos",
+    "Segurados do INSS e familiares",
+    "Famílias em decisões patrimoniais",
+    "Compradores, vendedores e locadores de imóveis",
+    "Profissionais liberais e autônomos",
+    "Servidores e candidatos a concursos",
+    "Advogados e estudantes de Direito",
+    "Outro segmento específico"
+]
+LEGAL_AREAS = [
+    "Direito do Consumidor","Direito do Trabalho","Direito Previdenciário","Direito de Família e Sucessões",
+    "Direito Empresarial","Direito Tributário","Direito Civil e Contratos","Direito Imobiliário",
+    "Direito Penal","Direito Administrativo","Direito Digital e LGPD","Direito Médico e da Saúde",
+    "Direito Ambiental","Propriedade Intelectual","Direito Eleitoral","Geral / interdisciplinar"
+]
+TONE_OPTIONS = ["Didático e direto","Analítico e técnico, mas acessível","Acolhedor sem alarmismo","Executivo para empresários","Editorial sofisticado","Pergunta e resposta"]
+ANGLE_OPTIONS = [
+    "Dúvida frequente explicada","Erro comum e como evitar","Mito versus realidade","Passo a passo prático",
+    "O que mudou e o que conferir","Checklist de prevenção","Cenário hipotético claramente identificado",
+    "Leitura de decisão ou notícia","Comparação de conceitos sem comparar profissionais"
+]
+CTA_OPTIONS = [
+    "Salvar como referência","Compartilhar informação útil","Consultar fonte oficial",
+    "Acompanhar a série de conteúdos","Conhecer informações institucionais",
+    "Enviar uma dúvida geral para pauta futura"
+]
+
+def local_draft(subject, fmt, audience, goal, area="Geral / interdisciplinar", funnel_stage=FUNNEL_STAGES[0], tone=TONE_OPTIONS[0], angle=ANGLE_OPTIONS[0], requested_cta=CTA_OPTIONS[0], details=""):
+    stage=(funnel_stage.split("|")[0] if "|" in funnel_stage else funnel_stage).strip()
+    cta_map={
+        "Descoberta":"Compartilhe este conteúdo informativo com quem possa considerá-lo útil.",
+        "Consideração":"Salve o checklist e confira as referências oficiais antes de tomar decisões.",
+        "Relacionamento":"Acompanhe os próximos conteúdos da série para aprofundar o tema.",
+        "Conversão editorial":"Consulte as informações institucionais e as fontes oficiais para entender os próximos passos disponíveis."
+    }
+    cta=cta_map.get(stage,"Salve e consulte as fontes oficiais.")
+    titles = [
+        f"O que está em jogo em {subject}?",
+        "O conceito que muda a leitura",
+        "Como a regra funciona em linhas gerais",
+        "Quais pontos precisam ser verificados",
+        "Onde surgem as dúvidas mais comuns",
+        "Como consultar a fonte correta",
+        "O que levar desta explicação"
+    ]
+    texts = [
+        f"Antes de tirar uma conclusão sobre {subject}, é preciso separar a regra geral dos detalhes de cada situação. Este conteúdo organiza os principais pontos para {audience.lower()}.",
+        f"Na área de {area}, termos parecidos podem ter efeitos diferentes. A análise começa pela definição aplicável e pelo contexto, não apenas pelo nome que aparece em um documento.",
+        "O caminho de leitura é: identificar a situação, localizar a regra aplicável e conferir os requisitos e exceções na fonte primária. A aplicação concreta depende dos fatos e da norma vigente.",
+        "Confira datas, documentos, destinatário da regra, eventuais exceções e se houve alteração normativa ou decisão posterior. Não conclua que um direito ou obrigação existe apenas com base em um resumo.",
+        "A dúvida recorrente costuma surgir quando se transforma uma regra geral em resposta automática. Sem os fatos relevantes, a explicação deve permanecer geral e condicional.",
+        "Priorize legislação atualizada, páginas oficiais de tribunais e órgãos competentes e o inteiro teor de decisões citadas. Notícias ajudam a encontrar o assunto, mas não substituem a fonte primária.",
+        f"Para {goal.lower()}, o próximo passo informativo é consultar as referências, identificar quais fatos ainda faltam e evitar conclusões universais. {cta}"
+    ]
+    slides=[{"titulo":t,"texto":v,"visual":f"Direção editorial ilustrada relacionada a {area}; hierarquia tipográfica e ícone temático.","objetivo_do_slide":("gancho" if i==0 else "explicação" if i<5 else "síntese")} for i,(t,v) in enumerate(zip(titles,texts))]
+    if fmt=="Carrossel": slides=slides[:7]
+    elif fmt=="Post estático": slides=[{"titulo":subject,"texto":texts[0]+" "+texts[6],"visual":f"Cartaz editorial de {area}, com ilustração temática.","objetivo_do_slide":"síntese"}]
+    elif fmt in ("Legenda","Reel"): slides=[]
+    script=[
+        {"cena":"Gancho (0–4 s)","fala":f"Uma dúvida comum sobre {subject} é confundir a regra geral com o que depende dos fatos.","visual":f"Plano médio; título visual associado a {area}; texto curto na tela."},
+        {"cena":"Explicação (4–16 s)","fala":f"Para entender o tema, comece pelo conceito e identifique qual regra realmente se aplica ao contexto de {audience.lower()}.","visual":"Corte para duas ou três palavras-chave e uma ilustração editorial específica."},
+        {"cena":"Aplicação (16–32 s)","fala":"Confira os requisitos, as exceções e a data da norma. Um resumo ou uma manchete não substitui a consulta à fonte original.","visual":"Lista visual de três verificações, sem ícones genéricos de banco de imagens."},
+        {"cena":"Fechamento (32–42 s)","fala":cta+" Informação geral; cada situação exige avaliação dos fatos e das regras aplicáveis.","visual":"Síntese com identidade visual e referência para conferência."}
+    ] if fmt=="Reel" else []
+    caption=(f"{subject}\n\n{texts[0]}\n\n{texts[2]}\n\n{texts[3]}\n\n{cta}\n\nConteúdo informativo geral. Confira as fontes oficiais e considere as particularidades de cada situação.")
+    if fmt=="Legenda": caption=caption
+    hashtags=["#InformaçãoJurídica","#Direito", "#"+re.sub(r"[^A-Za-z0-9]","",area.title().replace("Direito",""))[:22]]
+    return {
+        "titulo":subject,"promessa_editorial":f"Explicar {subject} com clareza para {audience}.","angulo_editorial":angle,
+        "publico":audience,"area_direito":area,"etapa_funil":stage,"resumo_estrategico":f"{goal}: conteúdo {stage.lower()}, em tom {tone.lower()}, com foco em {audience}.",
+        "gancho":texts[0],"slides":slides,"roteiro":script,"legenda":caption,"cta_educativa":cta,
+        "hashtags":hashtags,"fontes_para_conferir":["Texto legal oficial e atualizado aplicável ao tema","Página oficial do tribunal ou órgão competente; conferir data, contexto e inteiro teor da decisão, se houver"],
+        "checklist_revisao":["Confirmar todos os fundamentos jurídicos em fonte primária","Revisar a clareza para o público escolhido","Conferir sobriedade e caráter informativo conforme as regras da OAB"]
+    }
 def error_detail(response):
     try:
         payload=response.json()
@@ -236,39 +317,223 @@ def call_groq(prompt):
         except requests.RequestException as exc:
             failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
     raise RuntimeError("Nenhum modelo Groq funcionou. " + " | ".join(failures[:3]))
-def generate(subject, fmt, audience, goal, details=""):
-    brief=json.dumps({"assunto":subject,"formato":fmt,"publico":audience,"objetivo":goal,"contexto_fontes_e_restricoes":details},ensure_ascii=False)
+def generate(subject, fmt, audience, goal, details="", area="Geral / interdisciplinar", funnel_stage=FUNNEL_STAGES[0], tone=TONE_OPTIONS[0], angle=ANGLE_OPTIONS[0], requested_cta=CTA_OPTIONS[0]):
+    brief=json.dumps({"assunto":subject,"area_do_direito":area,"publico_segmentado":audience,"formato":fmt,"objetivo_editorial":goal,"etapa_do_funil":funnel_stage,"tom_de_voz":tone,"angulo_editorial":angle,"preferencia_de_cta_educativa":requested_cta,"paleta_visual":st.session_state.get("palette_choice","Azul-marinho e dourado"),"contexto_fontes_e_restricoes":details},ensure_ascii=False)
     errors=[]
     for name,fn in [("Gemini",call_gemini),("Groq (alternativo)",call_groq)]:
         try: return fn("Crie a peça a partir deste briefing. Não invente referências jurídicas. "+brief),name
         except Exception as e: errors.append(name+": "+str(e))
-    result=local_draft(subject,fmt,audience,goal)
+    result=local_draft(subject,fmt,audience,goal,area,funnel_stage,tone,angle,requested_cta,details)
     result["aviso"]="IA externa indisponível; estrutura local usada. "+" | ".join(errors)
     return result,"Modelo local"
 
-PALETTES={"Azul-marinho e dourado":("#F6F3EC","#172A46","#B69A5A"),"Verde institucional":("#F2F6F2","#1A4038","#6E9B88"),"Vinho e off-white":("#F8F2F0","#451D2C","#B17D89"),"Grafite minimalista":("#F4F5F6","#242A31","#728394")}
-def make_art(title, body, palette, signature=""):
-    bg,ink,accent=PALETTES[palette]; im=Image.new("RGB",(1080,1350),bg); d=ImageDraw.Draw(im)
+PALETTES={
+    "Azul-marinho & champanhe":("#F5F1E8","#172842","#B79B61"),
+    "Verde-pinho & marfim":("#F2F4EE","#183F38","#829C83"),
+    "Vinho & rosa mineral":("#F7F0F0","#492433","#BA8794"),
+    "Grafite & prata":("#F2F4F7","#252B36","#8A9AAF"),
+    "Azul petróleo & cobre":("#EEF4F4","#123F49","#C17A52"),
+    "Terracota & areia":("#F7F0E7","#653E34","#C17C63"),
+    "Azul real & gelo":("#EFF4FB","#173C75","#628FD0"),
+    "Oliva & papel":("#F5F3E8","#41492C","#9A9A64"),
+    "Ameixa & lavanda":("#F5F0F7","#40264B","#A78AB7"),
+    "Personalizada":("#F5F1E8","#172842","#B79B61")
+}
+def _rgb(hex_colour):
+    value=hex_colour.lstrip("#")
+    return tuple(int(value[i:i+2],16) for i in (0,2,4))
+
+def _blend(color_a,color_b,ratio):
+    a=_rgb(color_a) if isinstance(color_a,str) else color_a
+    b=_rgb(color_b) if isinstance(color_b,str) else color_b
+    return tuple(int(a[i]*(1-ratio)+b[i]*ratio) for i in range(3))
+
+def _topic_icon(area):
+    value=unicodedata.normalize("NFKD",str(area)).encode("ascii","ignore").decode("ascii").lower()
+    if "consum" in value: return "protection"
+    if "trabalho" in value: return "briefcase"
+    if "previd" in value: return "shield"
+    if "famil" in value or "sucess" in value: return "home"
+    if "empres" in value: return "building"
+    if "tribut" in value: return "calculator"
+    if "imobili" in value: return "architecture"
+    if "digital" in value or "lgpd" in value: return "network"
+    if "penal" in value: return "shield"
+    if "eleitoral" in value: return "ballot"
+    if "ambient" in value: return "leaf"
+    if "saude" in value or "medico" in value: return "cross"
+    if "propriedade" in value or "intelectual" in value: return "document"
+    return "scales"
+
+def _draw_icon(draw, kind, cx, cy, unit, ink, accent, light):
+    w=max(5,int(unit*0.045)); u=unit
+    def line(points,fill=ink,width=None):
+        draw.line(points,fill=fill,width=width or w,joint="curve")
+    if kind=="scales":
+        line([(cx,cy-u*.48),(cx,cy+u*.37)],ink)
+        line([(cx-u*.34,cy-u*.30),(cx+u*.34,cy-u*.30)],ink)
+        line([(cx-u*.24,cy-u*.30),(cx-u*.34,cy-u*.03)],accent)
+        line([(cx-u*.42,cy-u*.03),(cx-u*.26,cy-u*.03)],accent)
+        line([(cx-u*.34,cy-u*.03),(cx-u*.45,cy+u*.15),(cx-u*.23,cy+u*.15),(cx-u*.34,cy-u*.03)],accent)
+        line([(cx+u*.24,cy-u*.30),(cx+u*.34,cy-u*.03)],accent)
+        line([(cx+u*.26,cy-u*.03),(cx+u*.45,cy-u*.03)],accent)
+        line([(cx+u*.34,cy-u*.03),(cx+u*.23,cy+u*.15),(cx+u*.45,cy+u*.15),(cx+u*.34,cy-u*.03)],accent)
+        line([(cx-u*.17,cy+u*.37),(cx+u*.17,cy+u*.37)],ink)
+        line([(cx-u*.25,cy+u*.44),(cx+u*.25,cy+u*.44)],ink)
+    elif kind in ("building","architecture"):
+        draw.rectangle((cx-u*.32,cy-u*.42,cx+u*.32,cy+u*.39),outline=ink,width=w)
+        line([(cx-u*.39,cy-u*.42),(cx,cy-u*.55),(cx+u*.39,cy-u*.42)],accent)
+        for row in range(3):
+            for col in range(3):
+                x=cx-u*.21+col*u*.21; y=cy-u*.29+row*u*.21
+                draw.rounded_rectangle((x-u*.045,y-u*.055,x+u*.045,y+u*.055),radius=2,fill=accent)
+        draw.rectangle((cx-u*.07,cy+u*.20,cx+u*.07,cy+u*.39),fill=light)
+    elif kind=="briefcase":
+        draw.rounded_rectangle((cx-u*.39,cy-u*.15,cx+u*.39,cy+u*.31),radius=int(u*.06),outline=ink,width=w)
+        draw.arc((cx-u*.19,cy-u*.35,cx+u*.19,cy+u*.02),180,360,fill=ink,width=w)
+        line([(cx-u*.39,cy+u*.02),(cx+u*.39,cy+u*.02)],accent)
+        draw.rectangle((cx-u*.05,cy-u*.02,cx+u*.05,cy+u*.08),fill=accent)
+    elif kind=="protection" or kind=="shield":
+        pts=[(cx,cy-u*.48),(cx+u*.34,cy-u*.32),(cx+u*.29,cy+u*.10),(cx,cy+u*.43),(cx-u*.29,cy+u*.10),(cx-u*.34,cy-u*.32),(cx,cy-u*.48)]
+        draw.polygon(pts,fill=light)
+        line(pts,ink)
+        line([(cx-u*.16,cy),(cx-u*.03,cy+u*.13),(cx+u*.19,cy-u*.13)],accent,max(w,int(u*.06)))
+        if kind=="protection":
+            draw.arc((cx-u*.17,cy-u*.13,cx+u*.17,cy+u*.19),180,360,fill=accent,width=w)
+    elif kind=="home":
+        draw.polygon([(cx-u*.42,cy-u*.08),(cx,cy-u*.43),(cx+u*.42,cy-u*.08)],fill=light)
+        line([(cx-u*.42,cy-u*.08),(cx,cy-u*.43),(cx+u*.42,cy-u*.08)],ink)
+        draw.rectangle((cx-u*.31,cy-u*.07,cx+u*.31,cy+u*.34),outline=ink,width=w)
+        draw.rectangle((cx-u*.07,cy+u*.11,cx+u*.07,cy+u*.34),fill=accent)
+        draw.rectangle((cx-u*.23,cy, cx-u*.12,cy+u*.11),fill=accent)
+        draw.rectangle((cx+u*.12,cy,cx+u*.23,cy+u*.11),fill=accent)
+    elif kind=="calculator":
+        draw.rounded_rectangle((cx-u*.30,cy-u*.45,cx+u*.30,cy+u*.44),radius=int(u*.06),outline=ink,width=w)
+        draw.rounded_rectangle((cx-u*.20,cy-u*.34,cx+u*.20,cy-u*.17),radius=int(u*.02),fill=light,outline=accent,width=max(3,w//2))
+        for row in range(3):
+            for col in range(3):
+                x=cx-u*.19+col*u*.19; y=cy-u*.06+row*u*.16
+                draw.rounded_rectangle((x-u*.045,y-u*.045,x+u*.045,y+u*.045),radius=2,fill=accent if row==2 and col==2 else light,outline=accent,width=2)
+    elif kind=="network":
+        pts=[(cx,cy-u*.32),(cx-u*.30,cy-u*.12),(cx+u*.30,cy-u*.12),(cx-u*.23,cy+u*.25),(cx+u*.23,cy+u*.25),(cx,cy+u*.02)]
+        for i,j in [(0,1),(0,2),(1,3),(1,5),(2,4),(2,5),(3,4),(4,5)]:
+            line([pts[i],pts[j]],_blend(ink,light,.10),max(3,w//2))
+        for k,p in enumerate(pts):
+            rad=u*(.055 if k else .085)
+            draw.ellipse((p[0]-rad,p[1]-rad,p[0]+rad,p[1]+rad),fill=accent if k in (0,3) else light,outline=ink,width=w)
+    elif kind=="ballot":
+        draw.rounded_rectangle((cx-u*.34,cy-u*.42,cx+u*.34,cy+u*.4),radius=int(u*.04),outline=ink,width=w)
+        draw.rectangle((cx-u*.20,cy-u*.27,cx-u*.04,cy-u*.11),outline=accent,width=w)
+        line([(cx-u*.18,cy-u*.18),(cx-u*.12,cy-u*.12),(cx-u*.03,cy-u*.24)],accent)
+        for yy in [cy,cy+u*.16]:
+            line([(cx-u*.19,yy),(cx+u*.19,yy)],ink,max(3,w//2))
+    elif kind=="leaf":
+        draw.ellipse((cx-u*.28,cy-u*.45,cx+u*.28,cy+u*.25),outline=ink,width=w)
+        line([(cx-u*.22,cy+u*.26),(cx+u*.20,cy-u*.29)],accent)
+        line([(cx-u*.06,cy+u*.02),(cx+u*.18,cy+u*.01)],accent,max(3,w//2))
+        line([(cx-u*.01,cy-u*.10),(cx-u*.18,cy-u*.13)],accent,max(3,w//2))
+    elif kind=="cross":
+        draw.rounded_rectangle((cx-u*.36,cy-u*.36,cx+u*.36,cy+u*.36),radius=int(u*.08),outline=ink,width=w)
+        draw.rectangle((cx-u*.065,cy-u*.23,cx+u*.065,cy+u*.23),fill=accent)
+        draw.rectangle((cx-u*.23,cy-u*.065,cx+u*.23,cy+u*.065),fill=accent)
+    else:
+        draw.rounded_rectangle((cx-u*.30,cy-u*.43,cx+u*.30,cy+u*.43),radius=int(u*.03),outline=ink,width=w)
+        line([(cx-u*.18,cy-u*.22),(cx+u*.18,cy-u*.22)],accent)
+        line([(cx-u*.18,cy-u*.05),(cx+u*.18,cy-u*.05)],ink,max(3,w//2))
+        line([(cx-u*.18,cy+u*.12),(cx+u*.10,cy+u*.12)],ink,max(3,w//2))
+        line([(cx-u*.18,cy+u*.28),(cx+u*.18,cy+u*.28)],accent)
+
+def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None):
+    bg,ink,accent=PALETTES[palette]
+    bg_rgb=_rgb(bg); ink_rgb=_rgb(ink); accent_rgb=_rgb(accent)
+    im=Image.new("RGB",(1080,1350),bg_rgb); d=ImageDraw.Draw(im)
+    for y in range(1350):
+        t=y/1349
+        colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72)
+        d.line((0,y,1080,y),fill=colour)
     def font(sz,bold=False):
-        for p in ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"):
-            try:return ImageFont.truetype(p,sz)
-            except:pass
+        paths=(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf"] if bold else ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"])
+        for path in paths:
+            try: return ImageFont.truetype(path,sz)
+            except Exception: pass
         return ImageFont.load_default()
-    d.rectangle((0,0,1080,22),fill=accent); d.rectangle((72,92,150,101),fill=accent)
-    def wrap(txt,y,f,maxw,color,leading):
-        words=str(txt).split(); lines=[]; line=""
-        for w in words:
-            trial=(line+" "+w).strip()
-            if d.textbbox((0,0),trial,font=f)[2] < maxw or not line: line=trial
-            else: lines.append(line); line=w
-        if line:lines.append(line)
-        for ln in lines:d.text((72,y),ln,font=f,fill=color); y+=leading
-    wrap(title,170,font(66,True),920,ink,82)
-    d.rounded_rectangle((72,390,1008,395),radius=2,fill=accent)
-    wrap(body,440,font(35),900,ink,52)
-    d.text((72,1240),signature or "CONTEÚDO INFORMATIVO",font=font(22,True),fill=accent)
-    d.text((72,1280),"Confira as fontes. Cada caso exige análise individual.",font=font(18),fill=ink)
-    out=io.BytesIO(); im.save(out,format="PNG"); out.seek(0); return out
+    soft=_blend(bg_rgb,accent_rgb,.15)
+    very_soft=_blend(bg_rgb,accent_rgb,.075)
+    d.rectangle((0,0,1080,18),fill=accent_rgb)
+    d.ellipse((650,-190,1230,390),fill=soft)
+    d.ellipse((760,-95,1140,285),outline=accent_rgb,width=3)
+    icon_kind=_topic_icon(area)
+    stage_short=(funnel_stage.split("|")[0].strip() if "|" in funnel_stage else funnel_stage).upper()
+    if style=="Editorial premium":
+        label=f"{area.upper()}  /  {stage_short}"
+        d.rounded_rectangle((70,56,675,102),radius=18,fill=very_soft,outline=accent_rgb,width=1)
+        d.text((91,68),label[:47],font=font(18,True),fill=ink_rgb)
+        _draw_icon(d,icon_kind,850,245,250,ink_rgb,accent_rgb,bg_rgb)
+        d.ellipse((650,52,1040,442),outline=_blend(accent_rgb,ink_rgb,.25),width=2)
+    elif style=="Minimalismo editorial":
+        d.rectangle((0,0,18,1350),fill=accent_rgb)
+        d.text((70,66),area.upper()[:38],font=font(19,True),fill=accent_rgb)
+        _draw_icon(d,icon_kind,870,240,190,ink_rgb,accent_rgb,bg_rgb)
+    elif style=="Infográfico":
+        d.rounded_rectangle((700,65,1010,440),radius=40,fill=very_soft,outline=accent_rgb,width=2)
+        _draw_icon(d,icon_kind,855,248,210,ink_rgb,accent_rgb,bg_rgb)
+        d.text((70,68),f"GUIA  /  {slide_index:02d}",font=font(20,True),fill=accent_rgb)
+    else:
+        d.polygon([(0,0),(1080,0),(1080,300),(0,500)],fill=very_soft)
+        _draw_icon(d,icon_kind,850,245,220,ink_rgb,accent_rgb,bg_rgb)
+        d.text((70,67),area.upper()[:38],font=font(19,True),fill=accent_rgb)
+    def wrapped(txt,x,y,ft,max_width,color,leading,max_lines=8):
+        words=str(txt or "").split()
+        if not words: return y
+        lines=[]; line=""
+        for word in words:
+            candidate=(line+" "+word).strip()
+            if d.textbbox((0,0),candidate,font=ft)[2] <= max_width or not line:
+                line=candidate
+            else:
+                lines.append(line); line=word
+        if line: lines.append(line)
+        for line in lines[:max_lines]:
+            d.text((x,y),line,font=ft,fill=color)
+            y+=leading
+        if len(lines)>max_lines:
+            d.text((x,y),"…",font=ft,fill=color); y+=leading
+        return y
+    cover=(slide_index==1)
+    if cover:
+        title_y=470 if style!="Infográfico" else 455
+        title_size=68 if len(str(title))<43 else 57
+        y=wrapped(title,72,title_y,font(title_size,True),930,ink_rgb,int(title_size*1.18),4)
+        d.rounded_rectangle((72,y+12,280,y+19),radius=3,fill=accent_rgb)
+        y=wrapped(body,72,y+53,font(31),900,ink_rgb,43,8)
+    else:
+        d.text((72,160),f"IDEIA {slide_index:02d}  /  {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
+        title_size=58 if len(str(title))<42 else 49
+        y=wrapped(title,72,208,font(title_size,True),910,ink_rgb,int(title_size*1.16),4)
+        d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb)
+        y+=45
+        if style=="Infográfico":
+            d.rounded_rectangle((54,y-12,1025,1090),radius=26,fill=_blend(bg_rgb,accent_rgb,.055),outline=_blend(accent_rgb,bg_rgb,.45),width=2)
+            x_text=88; max_text=880
+        else:
+            x_text=86; max_text=855
+            d.rounded_rectangle((54,y-12,1025,1110),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
+        d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
+        y=wrapped(body,x_text,y+45,font(32),max_text,ink_rgb,45,13)
+    # Editorial marker and restrained footer; visual signature remains consistent across the carousel.
+    d.line((72,1204,1008,1204),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
+    d.text((72,1225),(signature or "CONTEÚDO INFORMATIVO")[:45],font=font(20,True),fill=ink_rgb)
+    d.text((72,1266),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
+    d.text((935,1302),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
+    if logo_bytes:
+        try:
+            logo=Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
+            logo.thumbnail((150,70))
+            im_rgba=im.convert("RGBA")
+            im_rgba.alpha_composite(logo,(900-logo.width,1170-logo.height))
+            im=im_rgba.convert("RGB")
+        except Exception: pass
+    out=io.BytesIO(); im.save(out,format="PNG",optimize=True); out.seek(0); return out
 
 st.title("⚖️ AdvFlow")
 st.caption("Estúdio de conteúdo jurídico informativo • agente de IA • calendário • métricas • radar jurídico")
