@@ -318,10 +318,102 @@ def call_groq(prompt):
         except requests.RequestException as exc:
             failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
     raise RuntimeError("Nenhum modelo Groq funcionou. " + " | ".join(failures[:3]))
+def parse_json_response(content):
+    """Parse JSON returned by chat-completion providers, tolerating fenced output."""
+    text_value=(content or "").strip()
+    text_value=re.sub(r"^\`\`\`(?:json)?\s*|\s*\`\`\`$", "", text_value, flags=re.I).strip()
+    try:
+        return json.loads(text_value)
+    except json.JSONDecodeError:
+        start=text_value.find("{"); end=text_value.rfind("}")
+        if start >= 0 and end > start:
+            return json.loads(text_value[start:end+1])
+        raise RuntimeError("O modelo não retornou um objeto JSON válido. Tente outro modelo no OpenRouter.")
+
+def call_openrouter(prompt):
+    key=secret("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit")
+    configured=secret("OPENROUTER_MODEL","openrouter/free")
+    candidates=model_candidates(configured,["openrouter/free"])
+    failures=[]
+    for model in candidates:
+        try:
+            response=requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization":"Bearer "+key,
+                    "Content-Type":"application/json",
+                    "HTTP-Referer":"https://github.com/henriquetrader281-pixel/advflow",
+                    "X-OpenRouter-Title":"AdvFlow"
+                },
+                json={
+                    "model":model,
+                    "temperature":0.55,
+                    "max_tokens":6500,
+                    "response_format":{"type":"json_object"},
+                    "messages":[
+                        {"role":"system","content":SYSTEM},
+                        {"role":"user","content":prompt+"\n\nRetorne apenas um JSON válido, sem markdown ou comentários."}
+                    ]
+                },
+                timeout=90
+            )
+            if not response.ok:
+                detail=error_detail(response)
+                failures.append(f"{model}: HTTP {response.status_code} ({detail})")
+                if response.status_code in (400,404,422):
+                    continue
+                raise RuntimeError(f"OpenRouter HTTP {response.status_code}: {detail}")
+            payload=response.json()
+            choices=payload.get("choices") or []
+            if not choices:
+                failures.append(f"{model}: resposta sem choices")
+                continue
+            message=choices[0].get("message") or {}
+            content=message.get("content")
+            if isinstance(content,list):
+                content="\n".join(str(part.get("text","")) for part in content if isinstance(part,dict))
+            result=parse_json_response(content or "")
+            if not isinstance(result,dict):
+                failures.append(f"{model}: resposta não é objeto JSON")
+                continue
+            result["_modelo_utilizado"]=model
+            result["_provedor_utilizado"]="OpenRouter"
+            return result
+        except requests.RequestException as exc:
+            failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
+        except (KeyError,IndexError,ValueError,json.JSONDecodeError) as exc:
+            failures.append(f"{model}: resposta inválida ({exc.__class__.__name__})")
+    raise RuntimeError("Nenhum modelo OpenRouter funcionou. "+" | ".join(failures[:3]))
+
+def test_openrouter_connection():
+    key=secret("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit")
+    model=secret("OPENROUTER_MODEL","openrouter/free").strip() or "openrouter/free"
+    response=requests.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        headers={
+            "Authorization":"Bearer "+key,
+            "Content-Type":"application/json",
+            "HTTP-Referer":"https://github.com/henriquetrader281-pixel/advflow",
+            "X-OpenRouter-Title":"AdvFlow"
+        },
+        json={"model":model,"max_tokens":12,"messages":[{"role":"user","content":"Responda apenas: OK"}]},
+        timeout=45
+    )
+    if not response.ok:
+        raise RuntimeError(f"OpenRouter HTTP {response.status_code}: {error_detail(response)}")
+    data=response.json()
+    if not data.get("choices"):
+        raise RuntimeError("OpenRouter respondeu, mas não retornou choices.")
+    return model
+
 def generate(subject, fmt, audience, goal, details="", area="Geral / interdisciplinar", funnel_stage=FUNNEL_STAGES[0], tone=TONE_OPTIONS[0], angle=ANGLE_OPTIONS[0], requested_cta=CTA_OPTIONS[0]):
     brief=json.dumps({"assunto":subject,"area_do_direito":area,"publico_segmentado":audience,"formato":fmt,"objetivo_editorial":goal,"etapa_do_funil":funnel_stage,"tom_de_voz":tone,"angulo_editorial":angle,"preferencia_de_cta_educativa":requested_cta,"paleta_visual":st.session_state.get("palette_choice","Azul-marinho e dourado"),"contexto_fontes_e_restricoes":details},ensure_ascii=False)
     errors=[]
-    for name,fn in [("Gemini",call_gemini),("Groq (alternativo)",call_groq)]:
+    for name,fn in [("Gemini",call_gemini),("Groq (alternativo)",call_groq),("OpenRouter (alternativo)",call_openrouter)]:
         try: return fn("Crie a peça a partir deste briefing. Não invente referências jurídicas. "+brief),name
         except Exception as e: errors.append(name+": "+str(e))
     result=local_draft(subject,fmt,audience,goal,area,funnel_stage,tone,angle,requested_cta,details)
@@ -1073,7 +1165,16 @@ with tabs[6]:
 with tabs[7]:
     st.subheader("Integrações e configuração")
     st.markdown("- **Gemini:** configure GEMINI_API_KEY e um modelo ativo na sua conta; padrão sugerido no código: gemini-3.8-flash.")
-    st.markdown("- **Alternativa Groq:** configure GROQ_API_KEY; o padrão sugerido é openai/gpt-oss-120b.")
+    st.markdown("- **Alternativa Groq:** configure GROQ_API_KEY; o modelo padrão vem de GROQ_MODEL.")
+    st.markdown("- **OpenRouter:** configure OPENROUTER_API_KEY em Secrets. O modelo padrão é openrouter/free; você pode alterá-lo em OPENROUTER_MODEL. Modelos gratuitos têm cotas e limites próprios.")
+    st.markdown("- **Chaves de API:** nunca publique chaves no GitHub; mantenha-as nos Secrets do Streamlit.")
+    if st.button("Testar conexão OpenRouter",key="test_openrouter_connection"):
+        try:
+            with st.spinner("Testando OpenRouter…"):
+                tested_model=test_openrouter_connection()
+            st.success("OpenRouter respondeu com sucesso. Modelo: "+tested_model)
+        except Exception as exc:
+            st.error("Falha no teste OpenRouter: "+str(exc))
     st.markdown("- **RSS:** feeds públicos configuráveis.")
     st.markdown("- **Instagram/Meta:** métricas são manuais; publicação, Insights e agendamento não estão conectados.")
     st.markdown("- **Armazenamento:** SQLite local. No Streamlit Cloud, o disco local pode não ser persistente; configure banco externo para uso duradouro.")
