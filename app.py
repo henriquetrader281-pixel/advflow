@@ -937,7 +937,7 @@ with tabs[2]:
         if custom_model.strip():
             chosen_model=custom_model.strip()
             model_metadata={}
-        image_reference=st.file_uploader("Imagem de referência opcional (estilo/continuidade)",type=["png","jpg","jpeg","webp"],key="openrouter_image_reference",help="Só será enviada se o modelo anunciar suporte a input_references. Evite usar imagens com dados pessoais ou documentos reais.")
+        image_reference=st.file_uploader("Imagem de referência opcional (estilo/continuidade)",type=["png","jpg","jpeg","webp","jfif"],key="openrouter_image_reference",help="Só será enviada se o modelo anunciar suporte a input_references. Evite usar imagens com dados pessoais ou documentos reais.")
         confirm_cost=st.checkbox("Confirmo que quero consumir créditos do OpenRouter para gerar esta imagem.",key="confirm_openrouter_image_cost")
         if st.button("Gerar imagem agora",type="primary",key="generate_openrouter_image"):
             if not secret("OPENROUTER_API_KEY"):
@@ -974,7 +974,7 @@ with tabs[2]:
         st.markdown("[Abrir o aplicativo Gemini](https://gemini.google.com/)")
         st.divider()
         st.markdown("#### Etapa 2 — importar e finalizar")
-        uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
+        uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp","jfif"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
         if uploaded:
             st.image(uploaded,use_container_width=True,caption="Imagem original gerada no Gemini")
             if st.button("Aplicar identidade visual e copy",type="primary",key="compose_gemini_plus_image"):
