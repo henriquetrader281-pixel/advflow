@@ -52,6 +52,10 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 
 - Agente de conteúdo com Gemini, Groq alternativo e estrutura local em caso de indisponibilidade.
 - Geração de imagens PNG tipográficas para posts.
+- Validador de métricas por usuário: metas personalizadas, limites de ação, comparação de janelas e recortes por etapa do funil e formato.
+- Indicadores de alcance, interações por alcance, salvamentos por alcance, compartilhamentos por alcance, visitas ao perfil por alcance e cliques por visita.
+- Alertas de qualidade: datas inválidas, alcance zero, temas vazios, dados parciais e possíveis registros duplicados; os dados antigos não são alterados automaticamente.
+- Configuração de metas por histórico e objetivo editorial, sem aplicar benchmarks universais ou apresentar correlação como causalidade.
 - Métricas manuais e exportação CSV.
 - Calendário editorial e exportação CSV.
 - Triagem lexical de publicidade jurídica.
@@ -59,7 +63,7 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 
 ## Integrações não implementadas
 
-- Instagram Insights, publicação e agendamento automáticos dependem de integração própria com a API oficial da Meta, permissões e tokens.
+- Instagram Insights, publicação e agendamento automáticos dependem de integração própria com a API oficial da Meta, permissões e tokens. O validador atual usa dados inseridos manualmente; a coluna de cobertura serve para marcar se os campos de Insights estão completos ou parciais.
 - O estúdio atual cria artes tipográficas; não gera ilustrações/fotografias por IA.
 - Recuperação de senha por e-mail, MFA e banco de dados gerenciado não estão implementados.
 
@@ -77,3 +81,17 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 - .streamlit/secrets.toml.example: exemplo sem credenciais reais
 - static/index.html: landing page estática
 - .github/workflows/validate.yml: verificação de sintaxe
+
+
+## Validação das métricas
+
+O validador aplica uma abordagem de gestão por indicadores e níveis de ação: escolha indicadores que correspondam ao objetivo editorial, defina uma meta e um limite que pede revisão e compare períodos equivalentes. Não existem metas predefinidas universais no sistema, pois taxas variam por perfil, formato, público, período e objetivo.
+
+- **Distribuição:** alcance médio por publicação.
+- **Interação:** interações agregadas divididas pelo alcance total.
+- **Utilidade:** salvamentos e compartilhamentos divididos pelo alcance.
+- **Jornada:** visitas ao perfil divididas pelo alcance e cliques em links divididos pelas visitas registradas, tratados como indicadores-proxy quando os dados têm janelas e fontes comparáveis.
+- **Qualidade de dados:** amostra pequena, dados parciais, alcance zero, datas inválidas, tema vazio e possíveis duplicatas são sinalizados.
+- **Limite de interpretação:** o painel descreve associações e variações; não prova que um post causou uma mudança. Para testar decisões, mantenha comparáveis a janela, o público, o formato e o objetivo e registre o contexto de cada alteração.
+
+No conteúdo de advocacia, métricas de desempenho não autorizam promessas de resultados, comparação profissional, exposição de casos ou chamadas que induzam contratação. A revisão ética continua sendo responsabilidade do profissional. Consulte o [Provimento 205/2021 da OAB](https://www.oab.org.br/leisnormas/legislacao/provimentos/205-2021) e as orientações oficiais vigentes.
