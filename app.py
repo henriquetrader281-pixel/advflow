@@ -1,7 +1,7 @@
 import os, re, json, sqlite3, io, hashlib, secrets, html, unicodedata, zipfile, textwrap
 from datetime import datetime, date, timedelta
 import requests, feedparser, pandas as pd, streamlit as st
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 st.set_page_config(page_title="AdvFlow | Marketing jurídico", page_icon="⚖️", layout="wide")
 DB = os.getenv("ADVFLOW_DB", "advflow.db")
@@ -449,92 +449,119 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
     bg_rgb=_rgb(bg); ink_rgb=_rgb(ink); accent_rgb=_rgb(accent)
     im=Image.new("RGB",(1080,1350),bg_rgb); d=ImageDraw.Draw(im)
     for y in range(1350):
-        t=y/1349
-        colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72)
-        d.line((0,y,1080,y),fill=colour)
+        t=y/1349; colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72); d.line((0,y,1080,y),fill=colour)
     def font(sz,bold=False):
         paths=(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf"] if bold else ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"])
         for path in paths:
-            try: return ImageFont.truetype(path,sz)
-            except Exception: pass
+            try:return ImageFont.truetype(path,sz)
+            except Exception:pass
         return ImageFont.load_default()
-    soft=_blend(bg_rgb,accent_rgb,.15)
-    very_soft=_blend(bg_rgb,accent_rgb,.075)
-    d.rectangle((0,0,1080,18),fill=accent_rgb)
-    d.ellipse((650,-190,1230,390),fill=soft)
-    d.ellipse((760,-95,1140,285),outline=accent_rgb,width=3)
-    icon_kind=_topic_icon(area)
-    stage_short=(funnel_stage.split("|")[0].strip() if "|" in funnel_stage else funnel_stage).upper()
-    if style=="Editorial premium":
-        label=f"{area.upper()}  /  {stage_short}"
-        d.rounded_rectangle((70,56,675,102),radius=18,fill=very_soft,outline=accent_rgb,width=1)
-        d.text((91,68),label[:47],font=font(18,True),fill=ink_rgb)
-        _draw_icon(d,icon_kind,850,245,250,ink_rgb,accent_rgb,bg_rgb)
-        d.ellipse((650,52,1040,442),outline=_blend(accent_rgb,ink_rgb,.25),width=2)
-    elif style=="Minimalismo editorial":
-        d.rectangle((0,0,18,1350),fill=accent_rgb)
-        d.text((70,66),area.upper()[:38],font=font(19,True),fill=accent_rgb)
-        _draw_icon(d,icon_kind,870,240,190,ink_rgb,accent_rgb,bg_rgb)
-    elif style=="Infográfico":
-        d.rounded_rectangle((700,65,1010,440),radius=40,fill=very_soft,outline=accent_rgb,width=2)
-        _draw_icon(d,icon_kind,855,248,210,ink_rgb,accent_rgb,bg_rgb)
-        d.text((70,68),f"GUIA  /  {slide_index:02d}",font=font(20,True),fill=accent_rgb)
-    else:
-        d.polygon([(0,0),(1080,0),(1080,300),(0,500)],fill=very_soft)
-        _draw_icon(d,icon_kind,850,245,220,ink_rgb,accent_rgb,bg_rgb)
-        d.text((70,67),area.upper()[:38],font=font(19,True),fill=accent_rgb)
+    soft=_blend(bg_rgb,accent_rgb,.15); very_soft=_blend(bg_rgb,accent_rgb,.075)
+    d.rectangle((0,0,1080,18),fill=accent_rgb); d.ellipse((650,-190,1230,390),fill=soft); d.ellipse((760,-95,1140,285),outline=accent_rgb,width=3)
+    icon_kind=_topic_icon(area); stage_short=(funnel_stage.split("|")[0].strip() if "|" in funnel_stage else funnel_stage).upper()
+    d.rounded_rectangle((70,56,675,102),radius=18,fill=very_soft,outline=accent_rgb,width=1)
+    d.text((91,68),f"{area.upper()}  /  {stage_short}"[:47],font=font(18,True),fill=ink_rgb)
+    _draw_icon(d,icon_kind,850,245,250,ink_rgb,accent_rgb,bg_rgb)
     def wrapped(txt,x,y,ft,max_width,color,leading,max_lines=8):
-        words=str(txt or "").split()
-        if not words: return y
-        lines=[]; line=""
+        words=str(txt or "").split(); lines=[]; line=""
         for word in words:
             candidate=(line+" "+word).strip()
-            if d.textbbox((0,0),candidate,font=ft)[2] <= max_width or not line:
-                line=candidate
-            else:
-                lines.append(line); line=word
-        if line: lines.append(line)
-        for line in lines[:max_lines]:
-            d.text((x,y),line,font=ft,fill=color)
-            y+=leading
-        if len(lines)>max_lines:
-            d.text((x,y),"…",font=ft,fill=color); y+=leading
+            if d.textbbox((0,0),candidate,font=ft)[2] <= max_width or not line:line=candidate
+            else:lines.append(line);line=word
+        if line:lines.append(line)
+        for line in lines[:max_lines]:d.text((x,y),line,font=ft,fill=color);y+=leading
+        if len(lines)>max_lines:d.text((x,y),"…",font=ft,fill=color);y+=leading
         return y
-    cover=(slide_index==1)
-    if cover:
-        title_y=470 if style!="Infográfico" else 455
-        title_size=68 if len(str(title))<43 else 57
-        y=wrapped(title,72,title_y,font(title_size,True),930,ink_rgb,int(title_size*1.18),4)
+    if slide_index==1:
+        y=wrapped(title,72,470,font(68 if len(str(title))<43 else 57,True),930,ink_rgb,78,4)
         d.rounded_rectangle((72,y+12,280,y+19),radius=3,fill=accent_rgb)
-        y=wrapped(body,72,y+53,font(31),900,ink_rgb,43,8)
+        wrapped(body,72,y+53,font(31),900,ink_rgb,43,8)
     else:
-        d.text((72,160),f"IDEIA {slide_index:02d}  /  {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
-        title_size=58 if len(str(title))<42 else 49
-        y=wrapped(title,72,208,font(title_size,True),910,ink_rgb,int(title_size*1.16),4)
-        d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb)
-        y+=45
-        if style=="Infográfico":
-            d.rounded_rectangle((54,y-12,1025,1090),radius=26,fill=_blend(bg_rgb,accent_rgb,.055),outline=_blend(accent_rgb,bg_rgb,.45),width=2)
-            x_text=88; max_text=880
-        else:
-            x_text=86; max_text=855
-            d.rounded_rectangle((54,y-12,1025,1110),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
+        d.text((72,160),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
+        y=wrapped(title,72,208,font(58 if len(str(title))<42 else 49,True),910,ink_rgb,66,4)
+        d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb);y+=45
+        d.rounded_rectangle((54,y-12,1025,1110),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
         d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
-        y=wrapped(body,x_text,y+45,font(32),max_text,ink_rgb,45,13)
-    # Editorial marker and restrained footer; visual signature remains consistent across the carousel.
+        wrapped(body,86,y+45,font(32),855,ink_rgb,45,13)
     d.line((72,1204,1008,1204),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
     d.text((72,1225),(signature or "CONTEÚDO INFORMATIVO")[:45],font=font(20,True),fill=ink_rgb)
     d.text((72,1266),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
     d.text((935,1302),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
     if logo_bytes:
         try:
-            logo=Image.open(io.BytesIO(logo_bytes)).convert("RGBA")
-            logo.thumbnail((150,70))
-            im_rgba=im.convert("RGBA")
-            im_rgba.alpha_composite(logo,(900-logo.width,1170-logo.height))
-            im=im_rgba.convert("RGB")
-        except Exception: pass
-    out=io.BytesIO(); im.save(out,format="PNG",optimize=True); out.seek(0); return out
+            logo=Image.open(io.BytesIO(logo_bytes)).convert("RGBA");logo.thumbnail((150,70))
+            im_rgba=im.convert("RGBA");im_rgba.alpha_composite(logo,(900-logo.width,1170-logo.height));im=im_rgba.convert("RGB")
+        except Exception:pass
+    out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
+
+def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, aspect_ratio="4:5"):
+    bg,ink,accent=palette
+    styles={
+      "Fotografia editorial premium":"fotografia editorial realista, direção de arte de revista premium, luz controlada e natural, materiais e texturas verossímeis, enquadramento intencional",
+      "Ilustração conceitual":"ilustração editorial autoral, metáfora visual específica, camadas e textura tátil, acabamento sofisticado de publicação de design",
+      "Colagem contemporânea":"colagem editorial contemporânea, mistura refinada de fotografia e recortes geométricos, composição assimétrica, textura de papel e profundidade",
+      "3D sofisticado":"natureza-morta 3D de alto padrão, objetos com materiais plausíveis, iluminação de estúdio e sombras delicadas",
+      "Documental cinematográfica":"fotografia documental cinematográfica, ambiente realista, iluminação natural, detalhes observacionais e composição precisa",
+      "Infográfico ilustrado":"infográfico editorial com poucos elementos, diagrama visual claro e ilustrações específicas, sem aparência de template pronto"
+    }
+    return f"""Crie uma imagem inédita para conteúdo informativo de um escritório de advocacia brasileiro. Formato vertical {aspect_ratio}, destinada ao Instagram e à finalização no AdvFlow.
+TEMA EXATO: {title}
+IDEIA A COMUNICAR: {str(body)[:700]}
+ÁREA JURÍDICA: {area}
+PÚBLICO: {audience}
+TOM: {tone}
+DIREÇÃO VISUAL: {visual_direction or "Escolha um cenário, objeto, ação ou metáfora diretamente ligados ao assunto específico do slide."}
+ESTILO: {styles.get(style,style)}
+PALETA: {palette_name}; harmonize with {bg} (background), {ink} (dark ink), {accent} (accent colour), without forcing every colour into the scene.
+DIREÇÃO DE ARTE: uma ideia visual forte e específica, acabamento de revista/editorial profissional, textura, luz, profundidade e composição deliberada. Reserve espaço visual relativamente limpo no lado esquerdo e na parte inferior para que o título e o texto sejam aplicados depois. Coloque o foco principal no lado direito ou superior direito, sem cortar elementos essenciais. Para uma série, mantenha tratamento visual coerente, mas varie cenário e metáfora conforme o slide.
+NÃO incluir texto, letras, palavras, números, legendas, logotipo ou marca-d'água. Não usar clichês jurídicos genéricos (balança da justiça, martelo, livros jurídicos, aperto de mãos, reunião em escritório), salvo quando forem essenciais ao conceito. Não incluir dados reais, informações de clientes ou documentos identificáveis. Não copiar a identidade visual de terceiros. Gerar apenas a imagem de fundo, em alta qualidade."""
+    
+def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="Geral / interdisciplinar", slide_index=1, total_slides=1):
+    bg,ink,accent=PALETTES[palette];bg_rgb=_rgb(bg);ink_rgb=_rgb(ink);accent_rgb=_rgb(accent)
+    image=ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+    iw,ih=image.size;ratio=1080/1350
+    if iw/ih>ratio:
+        crop_w=int(ih*ratio);left=max(0,(iw-crop_w)//2);image=image.crop((left,0,left+crop_w,ih))
+    else:
+        crop_h=int(iw/ratio);top=max(0,(ih-crop_h)//2);image=image.crop((0,top,iw,top+crop_h))
+    image=image.resize((1080,1350),Image.Resampling.LANCZOS).convert("RGBA")
+    overlay=Image.new("RGBA",(1080,1350),(0,0,0,0));od=ImageDraw.Draw(overlay)
+    for x in range(1080):
+        alpha=int(205*max(0.0,1-x/980)**1.45)
+        if alpha>0:od.line((x,0,x,1350),fill=(*bg_rgb,alpha),width=1)
+    image=Image.alpha_composite(image,overlay);d=ImageDraw.Draw(image)
+    def font(sz,bold=False):
+        paths=(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf"] if bold else ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"])
+        for path in paths:
+            try:return ImageFont.truetype(path,sz)
+            except Exception:pass
+        return ImageFont.load_default()
+    def wrapped(txt,x,y,ft,max_width,fill,leading,max_lines):
+        words=str(txt or "").split();lines=[];line=""
+        for word in words:
+            trial=(line+" "+word).strip()
+            if d.textbbox((0,0),trial,font=ft)[2]<=max_width or not line:line=trial
+            else:lines.append(line);line=word
+        if line:lines.append(line)
+        for line in lines[:max_lines]:d.text((x,y),line,font=ft,fill=fill);y+=leading
+        if len(lines)>max_lines:d.text((x,y),"…",font=ft,fill=fill);y+=leading
+        return y
+    d.rectangle((0,0,1080,15),fill=accent_rgb)
+    d.rounded_rectangle((52,45,730,102),radius=18,fill=(*bg_rgb,230),outline=accent_rgb,width=2)
+    d.text((72,62),f"{area.upper()} / CONTEÚDO INFORMATIVO"[:48],font=font(18,True),fill=ink_rgb)
+    d.text((58,149),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(18,True),fill=accent_rgb)
+    y=wrapped(title,56,194,font(61 if len(str(title))<38 else 51,True),825,ink_rgb,68,4)
+    d.rounded_rectangle((58,y+12,270,y+20),radius=4,fill=accent_rgb)
+    panel_top=min(max(y+44,330),620)
+    d.rounded_rectangle((34,panel_top,865,1135),radius=25,fill=(*bg_rgb,224),outline=(*accent_rgb,160),width=2)
+    wrapped(body,68,panel_top+35,font(29),750,ink_rgb,41,14)
+    d.line((58,1192,1020,1192),fill=(*accent_rgb,235),width=2)
+    d.text((58,1215),(signature or "CONTEÚDO INFORMATIVO")[:45],font=font(20,True),fill=ink_rgb)
+    d.text((58,1255),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=ink_rgb)
+    d.text((935,1300),f"{slide_index:02d}/{max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
+    out=io.BytesIO();image.convert("RGB").save(out,format="PNG",optimize=True);out.seek(0);return out
+
+
 
 st.title("⚖️ AdvFlow")
 st.caption("Estúdio de conteúdo jurídico informativo • agente de IA • calendário • métricas • radar jurídico")
@@ -609,14 +636,52 @@ with tabs[1]:
         st.download_button("Baixar conteúdo JSON",json.dumps(d,ensure_ascii=False,indent=2),"advflow_conteudo.json","application/json")
 
 with tabs[2]:
-    st.subheader("Estúdio de imagens")
-    st.write("Cria artes tipográficas PNG para capa ou slide. Não gera fotografia ou ilustração por IA.")
+    st.subheader("Estúdio visual | Gemini Plus + AdvFlow")
+    st.write("Gere imagens no aplicativo Gemini usando sua assinatura. Depois importe a imagem aqui para aplicar a copy, a paleta e a assinatura do escritório. Este fluxo manual não usa uma chave de API.")
     draft=st.session_state.get("draft",{})
-    title=st.text_input("Título da arte",value=draft.get("titulo","Tema jurídico"))
-    body=st.text_area("Texto da arte",value=(draft.get("slides") or [{"texto":"Informação jurídica geral."}])[0].get("texto","Informação jurídica geral."),height=110)
-    if st.button("Gerar arte PNG"):
-        buf=make_art(title,body,palette,office+((" • "+oab) if oab else ""))
-        st.image(buf,use_container_width=True); st.download_button("Baixar arte PNG",buf.getvalue(),"advflow_arte.png","image/png")
+    slides=draft.get("slides") or [{"titulo":draft.get("titulo","Tema jurídico"),"texto":draft.get("gancho","Defina a ideia central do conteúdo."),"visual":"Crie uma cena editorial específica para este assunto."}]
+    options=[f"{i+1:02d} — {s.get('titulo','Slide')[:65]}" for i,s in enumerate(slides)]
+    selected=st.selectbox("Slide que vamos ilustrar",options,index=0)
+    slide_idx=options.index(selected); active=slides[slide_idx]
+    title=st.text_input("Título da arte",value=active.get("titulo",draft.get("titulo","Tema jurídico")),key="studio_title")
+    body=st.text_area("Texto que aparecerá na arte",value=active.get("texto",""),height=105,key="studio_body")
+    visual_direction=st.text_area("Direção visual específica",value=active.get("visual",""),height=90,key="studio_direction",help="Detalhe objeto, ambiente, gesto, luz, enquadramento e metáfora visual. Evite apenas 'imagem jurídica'.")
+    visual_style=st.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],index=0)
+    palette_options=list(PALETTES)
+    chosen_palette=st.selectbox("Paleta para a arte",palette_options,index=palette_options.index(palette) if palette in palette_options else 0,key="studio_palette")
+    if chosen_palette=="Personalizada":
+        PALETTES["Personalizada"]=(st.session_state.get("custom_bg","#F5F1E8"),st.session_state.get("custom_ink","#172842"),st.session_state.get("custom_accent","#B79B61"))
+    signature=office+(" • "+oab if oab else "")
+    area=draft.get("area_direito","Geral / interdisciplinar")
+    audience=draft.get("publico","público definido no briefing")
+    tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
+    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction)
+    st.markdown("#### Etapa 1 — criar a imagem no Gemini Plus")
+    st.caption("Abra o Gemini, cole o prompt abaixo, gere a imagem e salve o arquivo no computador. Peça a imagem sem texto: o AdvFlow aplica a tipografia depois e preserva melhor a acentuação.")
+    st.text_area("Prompt pronto para usar",value=prompt,height=260,key="gemini_plus_prompt")
+    st.download_button("Baixar prompt TXT",prompt.encode("utf-8"),"advflow_prompt_gemini.txt","text/plain",key="download_gemini_prompt")
+    st.markdown("[Abrir o aplicativo Gemini](https://gemini.google.com/)")
+    st.divider()
+    st.markdown("#### Etapa 2 — importar e finalizar")
+    uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
+    if uploaded:
+        st.image(uploaded,use_container_width=True,caption="Imagem original gerada no Gemini")
+        if st.button("Aplicar identidade visual e copy",type="primary",key="compose_gemini_plus_image"):
+            try:
+                final_img=compose_uploaded_art(uploaded.getvalue(),title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
+                st.session_state["gemini_plus_composed"]=final_img.getvalue()
+                st.session_state["gemini_plus_composed_name"]=f"advflow_slide_{slide_idx+1:02d}.png"
+                st.success("Imagem importada e finalizada.")
+            except Exception as e:st.error("Não foi possível processar essa imagem: "+str(e))
+    if st.session_state.get("gemini_plus_composed"):
+        st.image(st.session_state["gemini_plus_composed"],use_container_width=True,caption="Arte final do AdvFlow")
+        st.download_button("Baixar arte final PNG",st.session_state["gemini_plus_composed"],st.session_state.get("gemini_plus_composed_name","advflow_slide.png"),"image/png",key="download_composed_gemini_image")
+    with st.expander("Alternativa sem IA"):
+        st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada pelo Gemini.")
+        if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
+            buf=make_art(title,body,chosen_palette,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"))
+            st.image(buf,use_container_width=True)
+            st.download_button("Baixar arte local PNG",buf.getvalue(),"advflow_arte_local.png","image/png",key="download_local_studio_art")
 
 with tabs[3]:
     st.subheader("Validador de métricas e funil editorial")
