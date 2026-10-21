@@ -51,7 +51,9 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 ## Funcionalidades
 
 - Agente de conteúdo com Gemini, Groq alternativo e estrutura local em caso de indisponibilidade.
-- Geração de imagens PNG tipográficas para posts.
+- Estúdio visual integrado ao fluxo manual do Google AI Plus/Gemini: cria prompts de direção de arte específicos por slide, permite importar a imagem gerada no app Gemini e aplica copy, paleta e assinatura num PNG 4:5.
+- Arte tipográfica vetorial local como alternativa sem imagem IA.
+- Este fluxo de importação usa a assinatura do aplicativo Gemini manualmente e não exige chave de API Gemini.
 - Validador de métricas por usuário: metas personalizadas, limites de ação, comparação de janelas e recortes por etapa do funil e formato.
 - Indicadores de alcance, interações por alcance, salvamentos por alcance, compartilhamentos por alcance, visitas ao perfil por alcance e cliques por visita.
 - Alertas de qualidade: datas inválidas, alcance zero, temas vazios, dados parciais e possíveis registros duplicados; os dados antigos não são alterados automaticamente.
@@ -64,7 +66,8 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 ## Integrações não implementadas
 
 - Instagram Insights, publicação e agendamento automáticos dependem de integração própria com a API oficial da Meta, permissões e tokens. O validador atual usa dados inseridos manualmente; a coluna de cobertura serve para marcar se os campos de Insights estão completos ou parciais.
-- O estúdio atual cria artes tipográficas; não gera ilustrações/fotografias por IA.
+- O estúdio oferece duas opções: importar imagens criadas manualmente no aplicativo Gemini (com a assinatura do usuário) e finalizar no AdvFlow; ou criar uma arte tipográfica local. A importação não aciona a API de geração de imagens.
+- Para gerar imagens automaticamente dentro da aplicação via API Gemini, é necessário configurar uma chave de API em Streamlit Secrets. A API tem limites e faturamento próprios, separados da assinatura do app Gemini; confira as cotas e preços oficiais antes de ativar esse fluxo.
 - Recuperação de senha por e-mail, MFA e banco de dados gerenciado não estão implementados.
 
 ## Avisos operacionais
@@ -95,3 +98,14 @@ O validador aplica uma abordagem de gestão por indicadores e níveis de ação:
 - **Limite de interpretação:** o painel descreve associações e variações; não prova que um post causou uma mudança. Para testar decisões, mantenha comparáveis a janela, o público, o formato e o objetivo e registre o contexto de cada alteração.
 
 No conteúdo de advocacia, métricas de desempenho não autorizam promessas de resultados, comparação profissional, exposição de casos ou chamadas que induzam contratação. A revisão ética continua sendo responsabilidade do profissional. Consulte o [Provimento 205/2021 da OAB](https://www.oab.org.br/leisnormas/legislacao/provimentos/205-2021) e as orientações oficiais vigentes.
+
+
+## Fluxo de imagens com Gemini Plus
+
+1. Na aba **Estúdio de imagens**, selecione o slide e o estilo visual.
+2. Baixe o prompt gerado pelo AdvFlow ou copie-o para o aplicativo Gemini.
+3. No Gemini, gere uma imagem sem textos e salve o resultado em PNG/JPG/WebP.
+4. Volte ao AdvFlow, envie a imagem e clique em **Aplicar identidade visual e copy**. O app faz o corte vertical 4:5 e aplica a paleta, a tipografia, o título, o corpo e a assinatura do escritório.
+5. Baixe a arte final em PNG e confira legibilidade, enquadramento e exatidão do texto antes de publicar.
+
+A assinatura Google AI Plus amplia o acesso a recursos de imagem no aplicativo Gemini, mas não deve ser tratada como um saldo geral de chamadas de API em aplicações próprias. A API Gemini tem regras de limite e faturamento próprias. Consulte a [página oficial de planos Google AI](https://one.google.com/intl/pt-BR_br/about/google-ai-plans/) e a [documentação de faturamento da API Gemini](https://ai.google.dev/gemini-api/docs/billing?hl=pt).
