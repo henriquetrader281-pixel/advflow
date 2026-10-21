@@ -1,4 +1,4 @@
-import os, re, json, sqlite3, io, hashlib, secrets, html, unicodedata, zipfile, textwrap
+import os, re, json, sqlite3, io, hashlib, secrets, html, unicodedata, zipfile, textwrap, base64
 from datetime import datetime, date, timedelta
 import requests, feedparser, pandas as pd, streamlit as st
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -585,7 +585,7 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         except Exception:pass
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
-def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, aspect_ratio="4:5"):
+def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
     bg,ink,accent=palette
     styles={
       "Fotografia editorial premium":"fotografia editorial realista, direção de arte de revista premium, luz controlada e natural, materiais e texturas verossímeis, enquadramento intencional",
@@ -595,18 +595,176 @@ def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_n
       "Documental cinematográfica":"fotografia documental cinematográfica, ambiente realista, iluminação natural, detalhes observacionais e composição precisa",
       "Infográfico ilustrado":"infográfico editorial com poucos elementos, diagrama visual claro e ilustrações específicas, sem aparência de template pronto"
     }
-    return f"""Crie uma imagem inédita para conteúdo informativo de um escritório de advocacia brasileiro. Formato vertical {aspect_ratio}, destinada ao Instagram e à finalização no AdvFlow.
-TEMA EXATO: {title}
-IDEIA A COMUNICAR: {str(body)[:700]}
-ÁREA JURÍDICA: {area}
-PÚBLICO: {audience}
-TOM: {tone}
-DIREÇÃO VISUAL: {visual_direction or "Escolha um cenário, objeto, ação ou metáfora diretamente ligados ao assunto específico do slide."}
-ESTILO: {styles.get(style,style)}
-PALETA: {palette_name}; harmonize with {bg} (background), {ink} (dark ink), {accent} (accent colour), without forcing every colour into the scene.
-DIREÇÃO DE ARTE: uma ideia visual forte e específica, acabamento de revista/editorial profissional, textura, luz, profundidade e composição deliberada. Reserve espaço visual relativamente limpo no lado esquerdo e na parte inferior para que o título e o texto sejam aplicados depois. Coloque o foco principal no lado direito ou superior direito, sem cortar elementos essenciais. Para uma série, mantenha tratamento visual coerente, mas varie cenário e metáfora conforme o slide.
-NÃO incluir texto, letras, palavras, números, legendas, logotipo ou marca-d'água. Não usar clichês jurídicos genéricos (balança da justiça, martelo, livros jurídicos, aperto de mãos, reunião em escritório), salvo quando forem essenciais ao conceito. Não incluir dados reais, informações de clientes ou documentos identificáveis. Não copiar a identidade visual de terceiros. Gerar apenas a imagem de fundo, em alta qualidade."""
-    
+    type_directions={
+      "Cena editorial":"Uma única cena editorial forte: objeto, pessoa sem identidade reconhecível, ambiente e ação que expressem o ponto específico. Não tentar resumir a área inteira em símbolos genéricos.",
+      "Conceito visual":"Uma metáfora visual original e concreta, ligada à ideia jurídica exata, sem clichês de advocacia.",
+      "Infográfico sem texto":"Poucos elementos e hierarquia visual que expliquem a relação entre as ideias; não inserir palavras, números ou rótulos, pois serão aplicados depois.",
+      "Fluxo de etapas":"Representar visualmente uma sequência de etapas com objetos distintos e setas/sinais visuais simples, sem texto ou números.",
+      "Comparação de conceitos":"Dois contextos ou objetos visualmente distintos, em composição lado a lado, para mostrar a diferença sem incluir palavras.",
+      "Linha do tempo visual":"Uma progressão cronológica representada por objetos ou marcos visuais, sem datas escritas.",
+      "Checklist visual":"Um conjunto pequeno e organizado de documentos/objetos pertinentes ao tema, com espaços limpos para copy sobreposta.",
+      "Colagem editorial":"Camadas assimétricas de fotografia e formas, textura tátil e recortes que traduzam o argumento do slide."
+    }
+    density_directions={
+      "Enxuta":"Um assunto, um foco visual e bastante espaço negativo.",
+      "Equilibrada":"Um foco dominante e no máximo dois elementos de apoio claramente subordinados.",
+      "Rica em detalhes":"Mais textura, cenário e elementos contextuais, mantendo um foco dominante e sem poluição visual."
+    }
+    return f"""Crie uma imagem de fundo original e profissional para uma peça de comunicação jurídica brasileira. Proporção desejada {aspect_ratio}, formato vertical para Instagram e finalização posterior no AdvFlow.
+
+CONTEÚDO EXATO
+Headline: {title}
+Ideia do slide: {str(body)[:700]}
+Área jurídica: {area}
+Público: {audience}
+Tom: {tone}
+
+DIREÇÃO DE ARTE
+Tipo de composição: {visual_type}. {type_directions.get(visual_type, type_directions["Cena editorial"])}
+Estilo: {styles.get(style,style)}.
+Densidade: {density}. {density_directions.get(density,density_directions["Equilibrada"])}
+Direção visual adicional: {visual_direction or "Interprete o argumento e escolha uma cena, objeto, gesto, material ou metáfora visual diretamente relacionados a esta pauta."}
+Paleta: {palette_name}; harmonize with {bg} (background), {ink} (dark ink), and {accent} (accent colour), without forcing every colour into the scene.
+Série: mantenha iluminação, tratamento, textura e paleta coerentes com os outros slides, mas mude o cenário e a metáfora de acordo com o argumento de cada slide.
+
+COMPOSIÇÃO E ACABAMENTO
+Acabamento de revista/editorial profissional; iluminação deliberada; profundidade e textura verossímeis; composição limpa e assimétrica, sem parecer uma imagem genérica de banco de imagens. Reserve espaço negativo limpo principalmente à esquerda e na parte inferior para que headline e copy sejam aplicadas depois. Posicione o assunto visual dominante à direita ou na região superior direita, sem cortar detalhes essenciais.
+
+RESTRIÇÕES
+Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos ou pessoas numa reunião de escritório, a menos que o assunto exija exatamente esse objeto ou contexto. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
+
+def fetch_openrouter_image_models():
+    """Fetch the live Image API catalog; returned model metadata controls optional parameters."""
+    key=secret("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("Configure OPENROUTER_API_KEY em Streamlit Secrets para carregar o catálogo de imagens.")
+    response=requests.get(
+        "https://openrouter.ai/api/v1/images/models",
+        headers={"Authorization":"Bearer "+key,"Content-Type":"application/json"},
+        timeout=25
+    )
+    if not response.ok:
+        raise RuntimeError(f"Catálogo de imagens OpenRouter HTTP {response.status_code}: {error_detail(response)}")
+    entries=response.json().get("data") or []
+    models=[]
+    for item in entries:
+        if not isinstance(item,dict) or not isinstance(item.get("id"),str):
+            continue
+        architecture=item.get("architecture") or {}
+        outputs=architecture.get("output_modalities") or []
+        if outputs and "image" not in outputs:
+            continue
+        models.append({
+            "id":item["id"],
+            "name":str(item.get("name") or item["id"]),
+            "description":str(item.get("description") or ""),
+            "supported_parameters":item.get("supported_parameters") or [],
+            "architecture":architecture,
+            "endpoints":item.get("endpoints")
+        })
+    if not models:
+        raise RuntimeError("O catálogo respondeu, mas não retornou modelos geradores de imagem.")
+    return sorted(models,key=lambda row:(row["name"].lower(),row["id"].lower()))
+
+def _supported_parameter_map(meta):
+    value=(meta or {}).get("supported_parameters") or []
+    if isinstance(value,dict):
+        return value
+    if isinstance(value,(list,tuple,set)):
+        return {str(key):True for key in value}
+    return {}
+
+def _choose_enum_parameter(spec, preferred):
+    """Choose a preferred supported enum value, or omit the parameter."""
+    if isinstance(spec,dict):
+        values=spec.get("values") or spec.get("enum") or spec.get("options")
+        if isinstance(values,(list,tuple)) and values:
+            for value in preferred:
+                if value in values:
+                    return value
+            return values[0]
+        return None
+    if spec is True:
+        return preferred[0] if preferred else None
+    return None
+
+def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image=None, reference_mime="image/png"):
+    """Generate one image via OpenRouter's unified Image API; this endpoint can consume credits."""
+    key=secret("OPENROUTER_API_KEY")
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit.")
+    model_id=(model_id or "").strip()
+    if not model_id or "/" not in model_id:
+        raise RuntimeError("Selecione um identificador de modelo de imagem válido no catálogo OpenRouter.")
+    params=_supported_parameter_map(model_meta or {})
+    payload={"model":model_id,"prompt":prompt}
+    # Pass optional controls only when the live catalog advertises them.
+    if "aspect_ratio" in params:
+        ratio=_choose_enum_parameter(params.get("aspect_ratio"),["4:5","3:4","2:3","9:16","1:1"])
+        if ratio:
+            payload["aspect_ratio"]=ratio
+    else:
+        # Known models in the reviewed Hermes provider metadata; only use ratios the provider advertises.
+        known_ratios={
+            "google/gemini-3.1-flash-image":["4:5","3:4","2:3","9:16","1:1"],
+            "google/gemini-3.1-flash-lite-image":["4:5","3:4","2:3","9:16","1:1"],
+            "qwen/qwen-image-3-pro":["4:5","3:4","2:3","9:16","1:1"],
+            "openai/gpt-image-2":["3:4","2:3","9:16","1:1"],
+            "openai/gpt-image-1-mini":["2:3","1:1"]
+        }
+        ratio_list=known_ratios.get(model_id)
+        if ratio_list:
+            payload["aspect_ratio"]=ratio_list[0]
+    if "resolution" in params:
+        resolution=_choose_enum_parameter(params.get("resolution"),["2K","1K","4K","512"])
+        if resolution:
+            payload["resolution"]=resolution
+    if reference_image:
+        if "input_references" not in params:
+            raise RuntimeError("O modelo escolhido não anuncia suporte a imagem de referência. Escolha um modelo que liste input_references no catálogo ou retire a referência.")
+        ref_url=f"data:{reference_mime};base64,{base64.b64encode(reference_image).decode('ascii')}"
+        payload["input_references"]=[{"type":"image_url","image_url":{"url":ref_url}}]
+    response=requests.post(
+        "https://openrouter.ai/api/v1/images",
+        headers={
+            "Authorization":"Bearer "+key,
+            "Content-Type":"application/json",
+            "HTTP-Referer":"https://github.com/henriquetrader281-pixel/advflow",
+            "X-Title":"AdvFlow"
+        },
+        json=payload,
+        timeout=180
+    )
+    if not response.ok:
+        detail=error_detail(response)
+        if response.status_code==402:
+            raise RuntimeError("OpenRouter informou saldo insuficiente ou requisito mínimo de saldo para geração. Confira o painel de créditos. Detalhe: "+detail)
+        if response.status_code in (401,403):
+            raise RuntimeError("Chave OpenRouter inválida ou sem autorização para este modelo. "+detail)
+        if response.status_code==404:
+            raise RuntimeError("Modelo não encontrado na Image API. Atualize o catálogo e escolha um modelo com saída de imagem. "+detail)
+        raise RuntimeError(f"OpenRouter Image API HTTP {response.status_code}: {detail}")
+    result=response.json()
+    entries=result.get("data") or []
+    if not entries or not isinstance(entries[0],dict) or not entries[0].get("b64_json"):
+        raise RuntimeError("A API respondeu sem b64_json de imagem. Confira o modelo e tente outro.")
+    try:
+        image_bytes=base64.b64decode(entries[0]["b64_json"],validate=True)
+        Image.open(io.BytesIO(image_bytes)).verify()
+    except Exception as exc:
+        raise RuntimeError("A resposta da Image API não continha uma imagem válida: "+str(exc)) from exc
+    usage=result.get("usage") or {}
+    return {
+        "image_bytes":image_bytes,
+        "media_type":str(entries[0].get("media_type") or "image/png"),
+        "model":model_id,
+        "cost":usage.get("cost"),
+        "ratio":payload.get("aspect_ratio"),
+        "resolution":payload.get("resolution"),
+        "reference_used":bool(reference_image)
+    }
+
+
 def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="Geral / interdisciplinar", slide_index=1, total_slides=1):
     bg,ink,accent=PALETTES[palette];bg_rgb=_rgb(bg);ink_rgb=_rgb(ink);accent_rgb=_rgb(accent)
     image=ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
@@ -727,8 +885,8 @@ with tabs[1]:
         st.download_button("Baixar conteúdo JSON",json.dumps(d,ensure_ascii=False,indent=2),"advflow_conteudo.json","application/json")
 
 with tabs[2]:
-    st.subheader("Estúdio visual | Gemini Plus + AdvFlow")
-    st.write("Gere imagens no aplicativo Gemini usando sua assinatura. Depois importe a imagem aqui para aplicar a copy, a paleta e a assinatura do escritório. Este fluxo manual não usa uma chave de API.")
+    st.subheader("Estúdio visual | Gemini Plus, OpenRouter e AdvFlow")
+    st.caption("Método editorial: tipo de composição × estilo × paleta. Você pode usar a assinatura do Gemini manualmente ou gerar pela API do OpenRouter, com custo separado.")
     draft=st.session_state.get("draft",{})
     slides=draft.get("slides") or [{"titulo":draft.get("titulo","Tema jurídico"),"texto":draft.get("gancho","Defina a ideia central do conteúdo."),"visual":"Crie uma cena editorial específica para este assunto."}]
     options=[f"{i+1:02d} — {s.get('titulo','Slide')[:65]}" for i,s in enumerate(slides)]
@@ -737,7 +895,9 @@ with tabs[2]:
     title=st.text_input("Título da arte",value=active.get("titulo",draft.get("titulo","Tema jurídico")),key="studio_title")
     body=st.text_area("Texto que aparecerá na arte",value=active.get("texto",""),height=105,key="studio_body")
     visual_direction=st.text_area("Direção visual específica",value=active.get("visual",""),height=90,key="studio_direction",help="Detalhe objeto, ambiente, gesto, luz, enquadramento e metáfora visual. Evite apenas 'imagem jurídica'.")
+    visual_type=st.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],index=0,help="Princípio adaptado do fluxo de ilustração do Hermes: definir tipo, estilo e paleta antes de gerar.")
     visual_style=st.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],index=0)
+    visual_density=st.selectbox("Densidade visual",["Enxuta","Equilibrada","Rica em detalhes"],index=1)
     palette_options=list(PALETTES)
     chosen_palette=st.selectbox("Paleta para a arte",palette_options,index=palette_options.index(palette) if palette in palette_options else 0,key="studio_palette")
     if chosen_palette=="Personalizada":
@@ -746,29 +906,87 @@ with tabs[2]:
     area=draft.get("area_direito","Geral / interdisciplinar")
     audience=draft.get("publico","público definido no briefing")
     tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
-    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction)
-    st.markdown("#### Etapa 1 — criar a imagem no Gemini Plus")
-    st.caption("Abra o Gemini, cole o prompt abaixo, gere a imagem e salve o arquivo no computador. Peça a imagem sem texto: o AdvFlow aplica a tipografia depois e preserva melhor a acentuação.")
-    st.text_area("Prompt pronto para usar",value=prompt,height=260,key="gemini_plus_prompt")
-    st.download_button("Baixar prompt TXT",prompt.encode("utf-8"),"advflow_prompt_gemini.txt","text/plain",key="download_gemini_prompt")
-    st.markdown("[Abrir o aplicativo Gemini](https://gemini.google.com/)")
-    st.divider()
-    st.markdown("#### Etapa 2 — importar e finalizar")
-    uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
-    if uploaded:
-        st.image(uploaded,use_container_width=True,caption="Imagem original gerada no Gemini")
-        if st.button("Aplicar identidade visual e copy",type="primary",key="compose_gemini_plus_image"):
+    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density)
+    generation_mode=st.radio("Forma de gerar a imagem",["Gemini Plus manual — usa sua assinatura","OpenRouter — geração direta pela API"],index=0,horizontal=True,key="studio_generation_mode")
+    if generation_mode=="OpenRouter — geração direta pela API":
+        st.warning("A geração direta usa saldo/créditos do OpenRouter e pode cobrar por imagem. Não é coberta pela assinatura Gemini Plus. Só será feita ao clicar em “Gerar imagem agora”.")
+        models_key="openrouter_image_models_cache"
+        if st.button("Carregar/atualizar catálogo de modelos de imagem",key="refresh_openrouter_image_models"):
             try:
-                final_img=compose_uploaded_art(uploaded.getvalue(),title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
-                st.session_state["gemini_plus_composed"]=final_img.getvalue()
-                st.session_state["gemini_plus_composed_name"]=f"advflow_slide_{slide_idx+1:02d}.png"
-                st.success("Imagem importada e finalizada.")
-            except Exception as e:st.error("Não foi possível processar essa imagem: "+str(e))
-    if st.session_state.get("gemini_plus_composed"):
-        st.image(st.session_state["gemini_plus_composed"],use_container_width=True,caption="Arte final do AdvFlow")
-        st.download_button("Baixar arte final PNG",st.session_state["gemini_plus_composed"],st.session_state.get("gemini_plus_composed_name","advflow_slide.png"),"image/png",key="download_composed_gemini_image")
+                with st.spinner("Consultando catálogo de imagens do OpenRouter…"):
+                    st.session_state[models_key]=fetch_openrouter_image_models()
+                st.success(f"Modelos de imagem disponíveis: {len(st.session_state[models_key])}.")
+            except Exception as exc:
+                st.error(str(exc))
+        dynamic_models=st.session_state.get(models_key) or []
+        fallback_models=[
+            {"id":"google/gemini-3.1-flash-image","name":"Google Nano Banana 2 / Gemini 3.1 Flash Image","supported_parameters":{"aspect_ratio":{"values":["1:1","2:3","3:4","4:5","9:16","16:9"]},"resolution":{"values":["1K","2K","4K"]}}},
+            {"id":"bytedance-seed/seedream-4.5","name":"ByteDance Seedream 4.5","supported_parameters":{"aspect_ratio":{"values":["1:1","4:5","3:4","2:3","9:16","16:9"]}}},
+            {"id":"openai/gpt-image-2","name":"OpenAI GPT Image 2","supported_parameters":{"aspect_ratio":{"values":["1:1","3:2","2:3","4:3","3:4","16:9","9:16"]},"quality":{"values":["auto","low","medium","high"]}}},
+            {"id":"qwen/qwen-image-3-pro","name":"Qwen Image 3 Pro","supported_parameters":{"aspect_ratio":{"values":["1:1","4:5","3:4","2:3","9:16","16:9"]},"resolution":{"values":["1K","2K"]}}}
+        ]
+        model_list=dynamic_models or fallback_models
+        model_ids=[m["id"] for m in model_list]
+        recommended=secret("OPENROUTER_IMAGE_MODEL","google/gemini-3.1-flash-image")
+        default_model=recommended if recommended in model_ids else model_ids[0]
+        chosen_model=st.selectbox("Modelo de imagem",model_ids,index=model_ids.index(default_model),format_func=lambda model_id: next((m.get("name",model_id)+" · "+model_id for m in model_list if m["id"]==model_id),model_id),key="openrouter_image_model")
+        model_metadata=next((m for m in model_list if m["id"]==chosen_model),{})
+        custom_model=st.text_input("Outro identificador de modelo (opcional)",placeholder="Deixe vazio para usar o modelo selecionado")
+        if custom_model.strip():
+            chosen_model=custom_model.strip()
+            model_metadata={}
+        image_reference=st.file_uploader("Imagem de referência opcional (estilo/continuidade)",type=["png","jpg","jpeg","webp"],key="openrouter_image_reference",help="Só será enviada se o modelo anunciar suporte a input_references. Evite usar imagens com dados pessoais ou documentos reais.")
+        confirm_cost=st.checkbox("Confirmo que quero consumir créditos do OpenRouter para gerar esta imagem.",key="confirm_openrouter_image_cost")
+        if st.button("Gerar imagem agora",type="primary",key="generate_openrouter_image"):
+            if not secret("OPENROUTER_API_KEY"):
+                st.error("Configure OPENROUTER_API_KEY em Streamlit → Settings → Secrets.")
+            elif not confirm_cost:
+                st.warning("Marque a confirmação de custos antes de executar a geração.")
+            else:
+                reference_bytes=image_reference.getvalue() if image_reference else None
+                reference_mime=(image_reference.type if image_reference else "image/png")
+                try:
+                    with st.spinner("Gerando imagem profissional com OpenRouter…"):
+                        generated=generate_openrouter_image(prompt,chosen_model,model_metadata,reference_bytes,reference_mime)
+                        final_art=compose_uploaded_art(generated["image_bytes"],title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
+                    st.session_state["openrouter_image_final"]=final_art.getvalue()
+                    st.session_state["openrouter_image_meta"]=generated
+                    st.session_state["openrouter_image_name"]=f"advflow_openrouter_slide_{slide_idx+1:02d}.png"
+                    st.success("Imagem gerada e identidade visual aplicada.")
+                except Exception as exc:
+                    st.error("Não foi possível gerar a imagem: "+str(exc))
+        if st.session_state.get("openrouter_image_final"):
+            meta=st.session_state.get("openrouter_image_meta",{})
+            st.image(st.session_state["openrouter_image_final"],use_container_width=True,caption="Arte gerada via OpenRouter e finalizada no AdvFlow")
+            m1,m2,m3=st.columns(3)
+            m1.caption("Modelo: "+str(meta.get("model","—")))
+            m2.caption("Proporção enviada: "+str(meta.get("ratio") or "controlada pelo prompt/modelo"))
+            cost=meta.get("cost")
+            m3.caption("Custo informado pela API: "+(f"US$ {float(cost):.4f}" if isinstance(cost,(float,int)) else "não informado"))
+            st.download_button("Baixar arte final PNG",st.session_state["openrouter_image_final"],st.session_state.get("openrouter_image_name","advflow_openrouter.png"),"image/png",key="download_openrouter_image_final")
+    else:
+        st.markdown("#### Etapa 1 — criar a imagem no Gemini Plus")
+        st.caption("Abra o Gemini, cole o prompt abaixo, gere a imagem e salve o arquivo no computador. Peça a imagem sem texto: o AdvFlow aplica a tipografia depois e preserva melhor a acentuação.")
+        st.text_area("Prompt pronto para usar",value=prompt,height=300,key="gemini_plus_prompt")
+        st.download_button("Baixar prompt TXT",prompt.encode("utf-8"),"advflow_prompt_gemini.txt","text/plain",key="download_gemini_prompt")
+        st.markdown("[Abrir o aplicativo Gemini](https://gemini.google.com/)")
+        st.divider()
+        st.markdown("#### Etapa 2 — importar e finalizar")
+        uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
+        if uploaded:
+            st.image(uploaded,use_container_width=True,caption="Imagem original gerada no Gemini")
+            if st.button("Aplicar identidade visual e copy",type="primary",key="compose_gemini_plus_image"):
+                try:
+                    final_img=compose_uploaded_art(uploaded.getvalue(),title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
+                    st.session_state["gemini_plus_composed"]=final_img.getvalue()
+                    st.session_state["gemini_plus_composed_name"]=f"advflow_slide_{slide_idx+1:02d}.png"
+                    st.success("Imagem importada e finalizada.")
+                except Exception as e:st.error("Não foi possível processar essa imagem: "+str(e))
+        if st.session_state.get("gemini_plus_composed"):
+            st.image(st.session_state["gemini_plus_composed"],use_container_width=True,caption="Arte final do AdvFlow")
+            st.download_button("Baixar arte final PNG",st.session_state["gemini_plus_composed"],st.session_state.get("gemini_plus_composed_name","advflow_slide.png"),"image/png",key="download_composed_gemini_image")
     with st.expander("Alternativa sem IA"):
-        st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada pelo Gemini.")
+        st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada por IA.")
         if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
             buf=make_art(title,body,chosen_palette,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"))
             st.image(buf,use_container_width=True)
