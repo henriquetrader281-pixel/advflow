@@ -769,6 +769,14 @@ with tabs[3]:
                 ("profile_visit_rate","Visitas ao perfil / alcance","%"),
                 ("click_rate","Cliques / visitas ao perfil*","%")
             ]
+            metric_actions={
+                "reach":"Teste uma alteração por vez no gancho, no assunto ou na distribuição. Compare peças do mesmo tipo e da mesma etapa antes de concluir.",
+                "engagement_rate":"Leia separadamente comentários, salvamentos e compartilhamentos. Se o conteúdo recebe poucas interações, teste clareza, especificidade e aderência ao público — não apenas perguntas artificiais.",
+                "save_rate":"Teste um recurso realmente consultável: checklist, distinção conceitual, sequência de documentos ou referência oficial. Evite transformar hipótese em regra absoluta.",
+                "share_rate":"Destaque uma explicação útil para um grupo claramente definido e um resumo fácil de repassar; evite alarmismo ou promessa de resultado.",
+                "profile_visit_rate":"Verifique se o tema, a identificação profissional e a organização do perfil se conectam. Mantenha a comunicação informativa, sem induzir contratação.",
+                "click_rate":"Confira se o link funciona, se o destino corresponde à pauta e se a origem/janela das métricas é comparável. Priorize material informativo ou fonte oficial."
+            }
             card_cols=st.columns(3)
             for i,(key,label,unit) in enumerate(cards):
                 value=now_metrics.get(key)
@@ -791,6 +799,8 @@ with tabs[3]:
                         delta_text=f"Alvo: {saved_targets[key]['target_value']:g} {unit} · intervir abaixo de {saved_targets[key]['warning_value']:g}"
                         st.caption(delta_text)
                     st.caption(status)
+                    if value is not None and target and value < float(target["warning_value"]):
+                        st.caption("**Próxima hipótese a testar:** "+metric_actions.get(key,"Revise o objetivo e a qualidade da coleta antes de agir."))
             if len(recent)<5:
                 st.warning("Amostra pequena (menos de 5 publicações neste recorte). Trate a leitura como exploratória e não declare um formato vencedor.")
             if recent["data_completeness"].fillna("Parcial").ne("Completa").any():
