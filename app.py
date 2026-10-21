@@ -831,6 +831,14 @@ with tabs[3]:
             stage_rows.append({"Etapa":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Visitas/alcance %":round(vals["profile_visit_rate"],2) if vals["profile_visit_rate"] is not None else None})
         if stage_rows:
             st.dataframe(pd.DataFrame(stage_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
+        st.markdown("#### Comparação por objetivo informado")
+        objective_rows=[]
+        for group_name,group in recent.groupby("objective",dropna=False):
+            vals=metric_values(group)
+            objective_rows.append({"Objetivo":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Compartilhamentos/alcance %":round(vals["share_rate"],2) if vals["share_rate"] is not None else None,"Visitas/alcance %":round(vals["profile_visit_rate"],2) if vals["profile_visit_rate"] is not None else None})
+        if objective_rows:
+            st.dataframe(pd.DataFrame(objective_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
+        st.caption("Leitura semanal recomendada: escolha 2–3 indicadores que correspondam ao objetivo da publicação e defina de antemão qual valor acionará uma revisão. Não tente otimizar todos os números ao mesmo tempo.")
         show_all=st.checkbox("Ver tabela completa de publicações",value=False)
         if show_all:
             display_df=df.drop(columns=["date_parsed"],errors="ignore").copy()
