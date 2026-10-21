@@ -26,12 +26,13 @@ with db() as c:
         created_at TEXT NOT NULL
     )""")
     c.execute("CREATE TABLE IF NOT EXISTS pieces(id INTEGER PRIMARY KEY, created TEXT, subject TEXT, format TEXT, content TEXT, status TEXT, user_id TEXT NOT NULL DEFAULT 'legacy')")
-    c.execute("CREATE TABLE IF NOT EXISTS metrics(id INTEGER PRIMARY KEY, post_date TEXT, topic TEXT, format TEXT, reach INTEGER, likes INTEGER, comments INTEGER, saves INTEGER, shares INTEGER, user_id TEXT NOT NULL DEFAULT 'legacy', funnel_stage TEXT NOT NULL DEFAULT 'Descoberta', profile_visits INTEGER NOT NULL DEFAULT 0, link_clicks INTEGER NOT NULL DEFAULT 0)")
+    c.execute("CREATE TABLE IF NOT EXISTS metrics(id INTEGER PRIMARY KEY, post_date TEXT, topic TEXT, format TEXT, reach INTEGER, likes INTEGER, comments INTEGER, saves INTEGER, shares INTEGER, user_id TEXT NOT NULL DEFAULT 'legacy', funnel_stage TEXT NOT NULL DEFAULT 'Descoberta', profile_visits INTEGER NOT NULL DEFAULT 0, link_clicks INTEGER NOT NULL DEFAULT 0, data_completeness TEXT NOT NULL DEFAULT 'Parcial', objective TEXT NOT NULL DEFAULT 'Interações úteis')")
+    c.execute("CREATE TABLE IF NOT EXISTS metric_targets(user_id TEXT NOT NULL, metric_key TEXT NOT NULL, target_value REAL NOT NULL, warning_value REAL NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(user_id, metric_key))")
     c.execute("CREATE TABLE IF NOT EXISTS calendar(id INTEGER PRIMARY KEY, pub_date TEXT, pub_time TEXT, title TEXT, format TEXT, status TEXT, notes TEXT, user_id TEXT NOT NULL DEFAULT 'legacy')")
     migrations = {
         "users": {"role":"TEXT NOT NULL DEFAULT 'user'","active":"INTEGER NOT NULL DEFAULT 1","must_change_password":"INTEGER NOT NULL DEFAULT 0","failed_attempts":"INTEGER NOT NULL DEFAULT 0","locked_until":"TEXT","created_at":"TEXT"},
         "pieces": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'"},
-        "metrics": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'","funnel_stage":"TEXT NOT NULL DEFAULT 'Descoberta'","profile_visits":"INTEGER NOT NULL DEFAULT 0","link_clicks":"INTEGER NOT NULL DEFAULT 0"},
+        "metrics": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'","funnel_stage":"TEXT NOT NULL DEFAULT 'Descoberta'","profile_visits":"INTEGER NOT NULL DEFAULT 0","link_clicks":"INTEGER NOT NULL DEFAULT 0","data_completeness":"TEXT NOT NULL DEFAULT 'Parcial'","objective":"TEXT NOT NULL DEFAULT 'Interações úteis'"},
         "calendar": {"user_id":"TEXT NOT NULL DEFAULT 'legacy'"}
     }
     for table_name, cols in migrations.items():
@@ -618,24 +619,225 @@ with tabs[2]:
         st.image(buf,use_container_width=True); st.download_button("Baixar arte PNG",buf.getvalue(),"advflow_arte.png","image/png")
 
 with tabs[3]:
-    st.subheader("Métricas manuais")
+    st.subheader("Validador de métricas e funil editorial")
+    st.caption("Método: escolha poucos indicadores relevantes, defina antes o nível que pede uma mudança e acompanhe por período, formato e etapa. Os dados são inseridos manualmente; o painel não está conectado ao Instagram/Meta.")
+    with st.expander("Como interpretar este validador",expanded=False):
+        st.write("As metas são definidas pelo próprio escritório e pelo histórico do perfil. O sistema não usa taxas universais como se fossem benchmarks confiáveis.")
+        st.write("Alcance mede distribuição; interações, salvamentos e compartilhamentos medem tipos distintos de resposta; visitas ao perfil e cliques são sinais de próximo passo, não prova de contratação ou de causalidade.")
+        st.write("O painel sinaliza qualidade de dados e se a meta definida foi atingida. Uma publicação isolada ou poucas peças não são suficientes para afirmar que um formato funciona melhor.")
+        st.write("No marketing jurídico, métricas não justificam promessa de resultado, comparação, exposição de casos ou chamada que induza contratação. Revise o conteúdo sob as regras éticas vigentes.")
+    METRIC_DEFS = [
+        ("reach","Alcance médio por publicação","contas","Distribuição: média de contas alcançadas por peça."),
+        ("engagement_rate","Interações / alcance","%","(Curtidas + comentários + salvamentos + compartilhamentos) / alcance total."),
+        ("save_rate","Salvamentos / alcance","%","Sinal de utilidade percebida; não equivale a conversão."),
+        ("share_rate","Compartilhamentos / alcance","%","Sinal de propagação; não é prova de intenção comercial."),
+        ("profile_visit_rate","Visitas ao perfil / alcance","%","Sinal de interesse pelo perfil; comparar janelas compatíveis."),
+        ("click_rate","Cliques em link / visitas ao perfil","%","Indicador-proxy. As fontes e as janelas dos dois dados precisam ser comparáveis.")
+    ]
+    # Targets are personalized, persistent per user, and intentionally have no universal default.
+    with db() as c:
+        target_rows=[dict(r) for r in c.execute("SELECT * FROM metric_targets WHERE user_id=?",(user_id,))]
+    saved_targets={r["metric_key"]:r for r in target_rows}
+    with st.expander("Definir metas e limites de ação",expanded=not bool(target_rows)):
+        st.write("Para cada indicador, defina: **intervir abaixo de** (limite de alerta) e **meta desejada**. Use seu histórico, objetivo editorial e dados comparáveis. Deixe ambos em zero se ainda não tiver base para definir.")
+        with st.form("metric_target_form"):
+            proposed={}
+            for key,label,unit,description in METRIC_DEFS:
+                existing=saved_targets.get(key,{})
+                col_a,col_b=st.columns(2)
+                cap=(f" ({unit})" if unit=="%" else " (contas)")
+                warning=col_a.number_input(f"{label} — intervir abaixo de{cap}",min_value=0.0,value=float(existing.get("warning_value",0.0)),step=(0.1 if unit=="%" else 10.0),key=f"target_warning_{key}")
+                target=col_b.number_input(f"{label} — meta desejada{cap}",min_value=0.0,value=float(existing.get("target_value",0.0)),step=(0.1 if unit=="%" else 10.0),key=f"target_goal_{key}")
+                st.caption(description)
+                proposed[key]=(warning,target,unit,label)
+            save_targets=st.form_submit_button("Salvar metas do meu perfil",type="primary")
+        if save_targets:
+            invalid=[]
+            for key,(warning,target,unit,label) in proposed.items():
+                if (warning>0 or target>0) and not (target>warning>0):
+                    invalid.append(f"{label}: a meta precisa ser maior que o limite de ação, e ambos devem ser maiores que zero.")
+            if invalid:
+                for msg in invalid: st.error(msg)
+            else:
+                with db() as c:
+                    for key,(warning,target,unit,label) in proposed.items():
+                        if target>0 and warning>0:
+                            c.execute("INSERT INTO metric_targets(user_id,metric_key,target_value,warning_value,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,metric_key) DO UPDATE SET target_value=excluded.target_value,warning_value=excluded.warning_value,updated_at=excluded.updated_at",
+                                      (user_id,key,target,warning,datetime.now().isoformat(timespec="seconds")))
+                        else:
+                            c.execute("DELETE FROM metric_targets WHERE user_id=? AND metric_key=?",(user_id,key))
+                st.success("Metas salvas.")
+                st.rerun()
     with st.form("metric_form"):
         mdate=st.date_input("Data da publicação",value=date.today())
         topic=st.text_input("Tema / título")
         mformat=st.selectbox("Formato",["Carrossel","Reel","Post estático","Story","Outro"])
-        cols=st.columns(5); reach=cols[0].number_input("Alcance",min_value=0,step=1); likes=cols[1].number_input("Curtidas",min_value=0,step=1); comments=cols[2].number_input("Comentários",min_value=0,step=1); saves=cols[3].number_input("Salvamentos",min_value=0,step=1); shares=cols[4].number_input("Compartilhamentos",min_value=0,step=1)
-        save_m=st.form_submit_button("Salvar métricas")
+        stage=st.selectbox("Etapa editorial",["Descoberta","Consideração","Relacionamento","Conversão editorial"])
+        objective=st.selectbox("Objetivo principal da peça",["Alcance qualificado","Interações úteis","Salvamentos","Compartilhamentos","Visitas ao perfil","Cliques em link"])
+        cols=st.columns(4)
+        reach=cols[0].number_input("Alcance",min_value=0,step=1)
+        likes=cols[1].number_input("Curtidas",min_value=0,step=1)
+        comments=cols[2].number_input("Comentários",min_value=0,step=1)
+        saves=cols[3].number_input("Salvamentos",min_value=0,step=1)
+        cols2=st.columns(4)
+        shares=cols2[0].number_input("Compartilhamentos",min_value=0,step=1)
+        profile_visits=cols2[1].number_input("Visitas ao perfil atribuídas",min_value=0,step=1)
+        link_clicks=cols2[2].number_input("Cliques em links",min_value=0,step=1)
+        completeness=cols2[3].selectbox("Cobertura dos Insights",["Parcial","Completa"],help="Marque Completa apenas quando registrou os campos relevantes disponíveis para esta peça.")
+        save_m=st.form_submit_button("Registrar publicação e métricas")
     if save_m:
-        with db() as c:c.execute("INSERT INTO metrics(post_date,topic,format,reach,likes,comments,saves,shares,user_id) VALUES(?,?,?,?,?,?,?,?,?)",(str(mdate),topic,mformat,reach,likes,comments,saves,shares,user_id))
-        st.success("Métricas registradas.")
-    with db() as c: rows=[dict(r) for r in c.execute("SELECT * FROM metrics WHERE user_id=? ORDER BY post_date DESC",(user_id,))]
+        if not topic.strip():
+            st.warning("Informe o tema/título para que as comparações por pauta façam sentido.")
+        else:
+            with db() as c:
+                c.execute("INSERT INTO metrics(post_date,topic,format,reach,likes,comments,saves,shares,user_id,funnel_stage,profile_visits,link_clicks,data_completeness,objective) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                          (str(mdate),topic.strip(),mformat,reach,likes,comments,saves,shares,user_id,stage,profile_visits,link_clicks,completeness,objective))
+            st.success("Métricas registradas.")
+    with db() as c:
+        rows=[dict(r) for r in c.execute("SELECT * FROM metrics WHERE user_id=? ORDER BY post_date DESC",(user_id,))]
     if rows:
-        df=pd.DataFrame(rows); df["engajamentos"]=df[["likes","comments","saves","shares"]].sum(axis=1)
-        df["engajamento/alcance %"]=(df["engajamentos"]/df["reach"].replace(0,pd.NA)*100).round(2)
-        st.dataframe(df,use_container_width=True,hide_index=True)
-        st.download_button("Exportar CSV",df.to_csv(index=False).encode("utf-8-sig"),"advflow_metricas.csv","text/csv")
-        st.bar_chart(df.groupby("format")[["likes","comments","saves","shares"]].sum())
-
+        df=pd.DataFrame(rows)
+        for col,default in [("profile_visits",0),("link_clicks",0),("funnel_stage","Descoberta"),("data_completeness","Parcial"),("objective","Interações úteis")]:
+            if col not in df.columns: df[col]=default
+        df["date_parsed"]=pd.to_datetime(df["post_date"],errors="coerce")
+        df["stage_key"]=df["funnel_stage"].fillna("Descoberta").astype(str).str.split("|").str[0].str.strip()
+        # Data-quality checks are informational; the app does not silently rewrite historic inputs.
+        bad_dates=int(df["date_parsed"].isna().sum())
+        no_reach=int((df["reach"].fillna(0)<=0).sum())
+        blank_topics=int(df["topic"].fillna("").astype(str).str.strip().eq("").sum())
+        partial_rows=int(df["data_completeness"].fillna("Parcial").ne("Completa").sum())
+        dupes=int(df.duplicated(subset=["post_date","topic","format"],keep=False).sum())
+        with st.expander("Validação da qualidade dos dados",expanded=(bad_dates+no_reach+blank_topics+partial_rows>0)):
+            q1,q2,q3,q4=st.columns(4)
+            q1.metric("Datas inválidas",bad_dates)
+            q2.metric("Sem alcance válido",no_reach)
+            q3.metric("Tema vazio",blank_topics)
+            q4.metric("Dados parciais",partial_rows)
+            if dupes:
+                st.warning(f"{dupes} linhas participam de possíveis duplicatas de data + tema + formato. Confira se alguma publicação foi registrada duas vezes; nenhuma linha foi removida.")
+            if no_reach:
+                st.warning("As taxas com denominador alcance ficam indisponíveis nas linhas com alcance zero. Confirme se o zero significa ausência real de alcance ou dado não coletado.")
+            if partial_rows:
+                st.info("Os registros parciais entram nas contagens brutas, mas recomenda-se não usá-los para concluir sobre cliques, visitas ou a taxa de funil. Marque a cobertura real ao registrar cada publicação.")
+            if bad_dates or blank_topics:
+                st.warning("Corrija datas ou temas vazios na fonte dos dados antes de comparar pautas. As entradas antigas são sinalizadas, não alteradas automaticamente.")
+            if not (bad_dates or no_reach or blank_topics or partial_rows or dupes):
+                st.success("Não foram encontrados alertas básicos de integridade nos registros exibidos. Isso não garante que as métricas de origem estejam corretas.")
+        period_label=st.selectbox("Janela para validação",["Últimos 30 dias","Últimos 90 dias","Últimos 180 dias","Todo o histórico"],index=0)
+        period_days={"Últimos 30 dias":30,"Últimos 90 dias":90,"Últimos 180 dias":180,"Todo o histórico":None}[period_label]
+        date_now=pd.Timestamp(date.today())
+        stage_filter=st.selectbox("Filtrar etapa",["Todas","Descoberta","Consideração","Relacionamento","Conversão editorial"])
+        format_filter=st.selectbox("Filtrar formato",["Todos"]+sorted([str(x) for x in df["format"].dropna().unique()]))
+        recent=df.copy()
+        if period_days is not None:
+            cutoff=date_now-pd.Timedelta(days=period_days-1)
+            recent=recent[recent["date_parsed"].between(cutoff,date_now,inclusive="both")]
+        if stage_filter!="Todas": recent=recent[recent["stage_key"]==stage_filter]
+        if format_filter!="Todos": recent=recent[recent["format"]==format_filter]
+        def metric_values(frame):
+            reach_sum=float(frame["reach"].fillna(0).sum()) if len(frame) else 0.0
+            interactions=float(frame[["likes","comments","saves","shares"]].fillna(0).sum().sum()) if len(frame) else 0.0
+            saves_sum=float(frame["saves"].fillna(0).sum()) if len(frame) else 0.0
+            shares_sum=float(frame["shares"].fillna(0).sum()) if len(frame) else 0.0
+            visits_sum=float(frame["profile_visits"].fillna(0).sum()) if len(frame) else 0.0
+            clicks_sum=float(frame["link_clicks"].fillna(0).sum()) if len(frame) else 0.0
+            n=max(int(len(frame)),1)
+            return {
+                "reach":float(frame["reach"].fillna(0).mean()) if len(frame) else 0.0,
+                "engagement_rate":(interactions/reach_sum*100) if reach_sum else None,
+                "save_rate":(saves_sum/reach_sum*100) if reach_sum else None,
+                "share_rate":(shares_sum/reach_sum*100) if reach_sum else None,
+                "profile_visit_rate":(visits_sum/reach_sum*100) if reach_sum else None,
+                "click_rate":(clicks_sum/visits_sum*100) if visits_sum else None,
+                "posts":int(len(frame)),
+                "reach_total":reach_sum,
+                "interactions_total":interactions,
+                "visits_total":visits_sum,
+                "clicks_total":clicks_sum
+            }
+        now_metrics=metric_values(recent)
+        st.markdown("#### Resultado no período")
+        st.caption(f"{len(recent)} publicações no filtro selecionado. Taxas agregadas são calculadas por totais (não por média simples de percentuais), para que o alcance pese no denominador.")
+        if len(recent)==0:
+            st.info("Nenhuma publicação neste recorte. Registre publicações ou amplie o período.")
+        else:
+            cards=[
+                ("reach","Alcance médio / publicação","contas"),
+                ("engagement_rate","Interações / alcance","%"),
+                ("save_rate","Salvamentos / alcance","%"),
+                ("share_rate","Compartilhamentos / alcance","%"),
+                ("profile_visit_rate","Visitas ao perfil / alcance","%"),
+                ("click_rate","Cliques / visitas ao perfil*","%")
+            ]
+            card_cols=st.columns(3)
+            for i,(key,label,unit) in enumerate(cards):
+                value=now_metrics.get(key)
+                target=saved_targets.get(key)
+                if value is None:
+                    display="n/d"; status="Sem denominador suficiente"
+                else:
+                    display=(f"{value:,.1f}".replace(",","X").replace(".",",").replace("X",".")+" contas") if unit=="contas" else f"{value:.2f}%"
+                    if not target:
+                        status="Defina meta e limite para validar"
+                    elif value < float(target["warning_value"]):
+                        status="Abaixo do limite de ação"
+                    elif value >= float(target["target_value"]):
+                        status="Meta atingida"
+                    else:
+                        status="Monitorar: entre limite e meta"
+                with card_cols[i%3]:
+                    st.metric(label,display)
+                    if value is not None and key in saved_targets:
+                        delta_text=f"Alvo: {saved_targets[key]['target_value']:g} {unit} · intervir abaixo de {saved_targets[key]['warning_value']:g}"
+                        st.caption(delta_text)
+                    st.caption(status)
+            if len(recent)<5:
+                st.warning("Amostra pequena (menos de 5 publicações neste recorte). Trate a leitura como exploratória e não declare um formato vencedor.")
+            if recent["data_completeness"].fillna("Parcial").ne("Completa").any():
+                st.warning("Há registros parciais no período. Taxas de perfil/cliques podem estar subestimadas se os campos não foram coletados.")
+        # Side-by-side trend against an equally long earlier period, using the same stage/format filters.
+        if period_days is not None:
+            prev_cutoff=cutoff-pd.Timedelta(days=period_days)
+            previous=df[df["date_parsed"].between(prev_cutoff,cutoff-pd.Timedelta(days=1),inclusive="both")].copy()
+            if stage_filter!="Todas": previous=previous[previous["stage_key"]==stage_filter]
+            if format_filter!="Todos": previous=previous[previous["format"]==format_filter]
+            if len(previous) and len(recent):
+                prev_metrics=metric_values(previous)
+                st.markdown("#### Comparação com a janela anterior")
+                st.caption(f"Atual: {len(recent)} publicações · anterior: {len(previous)}. Mudança é descritiva, não prova que uma alteração de conteúdo causou o resultado.")
+                trend_rows=[]
+                for key,label,unit in cards:
+                    current_v=now_metrics.get(key); previous_v=prev_metrics.get(key)
+                    if current_v is None or previous_v is None:
+                        change="n/d"
+                    elif unit=="%":
+                        change=f"{current_v-previous_v:+.2f} p.p."
+                    else:
+                        change=f"{current_v-previous_v:+.1f} contas"
+                    trend_rows.append({"Indicador":label,"Atual":current_v,"Janela anterior":previous_v,"Variação":change})
+                st.dataframe(pd.DataFrame(trend_rows),use_container_width=True,hide_index=True)
+        # Compare formats/stages by computing a ratio of totals for each group.
+        st.markdown("#### Comparação por formato")
+        format_rows=[]
+        for group_name,group in recent.groupby("format",dropna=False):
+            vals=metric_values(group)
+            format_rows.append({"Formato":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Compartilhamentos/alcance %":round(vals["share_rate"],2) if vals["share_rate"] is not None else None})
+        if format_rows:
+            st.dataframe(pd.DataFrame(format_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
+        st.markdown("#### Comparação por etapa do funil")
+        stage_rows=[]
+        for group_name,group in recent.groupby("stage_key",dropna=False):
+            vals=metric_values(group)
+            stage_rows.append({"Etapa":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Visitas/alcance %":round(vals["profile_visit_rate"],2) if vals["profile_visit_rate"] is not None else None})
+        if stage_rows:
+            st.dataframe(pd.DataFrame(stage_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
+        show_all=st.checkbox("Ver tabela completa de publicações",value=False)
+        if show_all:
+            display_df=df.drop(columns=["date_parsed"],errors="ignore").copy()
+            st.dataframe(display_df,use_container_width=True,hide_index=True)
+        st.download_button("Exportar registros CSV",df.drop(columns=["date_parsed"],errors="ignore").to_csv(index=False).encode("utf-8-sig"),"advflow_metricas.csv","text/csv")
+    else:
+        st.info("Ainda não há métricas. Comece registrando publicações e os dados disponíveis nos Insights.")
 with tabs[4]:
     st.subheader("Radar jurídico | notícias com utilidade editorial")
     st.caption("Fontes oficiais e portais jurídicos, com filtros temáticos, data e relevância estimada. A classificação automática serve para organizar pautas, não para validar teses jurídicas.")
