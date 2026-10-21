@@ -23,6 +23,27 @@ As senhas não são armazenadas em texto simples: a aplicação usa PBKDF2-HMAC-
 
 Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignore.
 
+## OpenRouter como provedor alternativo
+
+O AdvFlow pode usar OpenRouter como terceiro provedor de texto, depois de Gemini e Groq e antes do rascunho local. O endpoint é compatível com a API de chat completions e o padrão sugerido é `openrouter/free`; modelos gratuitos têm disponibilidade e limites próprios.
+
+1. Crie uma conta e gere uma API key em https://openrouter.ai/keys.
+2. Abra o aplicativo no Streamlit Community Cloud → Settings → Secrets.
+3. Adicione as duas linhas abaixo (com a sua chave real somente no painel Secrets):
+
+```toml
+OPENROUTER_API_KEY = "SUA_CHAVE_REAL_DO_OPENROUTER"
+OPENROUTER_MODEL = "openrouter/free"
+```
+
+4. Salve e aguarde o aplicativo reiniciar.
+5. Na aba **Configuração**, clique em **Testar conexão OpenRouter**.
+6. Ao gerar copy, o AdvFlow tenta Gemini, depois Groq, depois OpenRouter e usa a estrutura local caso os três falhem.
+
+Se desejar outro modelo, copie o identificador exato do catálogo oficial: https://openrouter.ai/models. O valor de `OPENROUTER_MODEL` deve ser o slug do modelo, por exemplo o identificador gratuito mostrado no catálogo, e não o nome de exibição.
+
+**Segurança e custo:** nunca publique a chave no GitHub, não a envie por chat e configure limites de gasto/uso no painel OpenRouter se usar modelos pagos. O roteador `openrouter/free` direciona para modelos gratuitos compatíveis, mas capacidade, limite de requisições e disponibilidade podem variar. Para modelos pagos, a cobrança é separada das assinaturas do aplicativo Gemini ou de outros provedores.
+
 ## Modelos de IA
 
 - Gemini: crie uma chave em https://aistudio.google.com/apikey. Modelo padrão sugerido: gemini-3.8-flash.
