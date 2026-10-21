@@ -321,7 +321,7 @@ def call_groq(prompt):
 def parse_json_response(content):
     """Parse JSON returned by chat-completion providers, tolerating fenced output."""
     text_value=(content or "").strip()
-    text_value=re.sub(r"^\`\`\`(?:json)?\s*|\s*\`\`\`$", "", text_value, flags=re.I).strip()
+    text_value=re.sub(r"^(?:\x60{3})(?:json)?\s*|\s*(?:\x60{3})$", "", text_value, flags=re.I).strip()
     try:
         return json.loads(text_value)
     except json.JSONDecodeError:
@@ -351,7 +351,6 @@ def call_openrouter(prompt):
                     "model":model,
                     "temperature":0.55,
                     "max_tokens":6500,
-                    "response_format":{"type":"json_object"},
                     "messages":[
                         {"role":"system","content":SYSTEM},
                         {"role":"user","content":prompt+"\n\nRetorne apenas um JSON válido, sem markdown ou comentários."}
