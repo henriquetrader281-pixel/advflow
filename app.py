@@ -723,8 +723,8 @@ with tabs[3]:
                 st.warning("Corrija datas ou temas vazios na fonte dos dados antes de comparar pautas. As entradas antigas são sinalizadas, não alteradas automaticamente.")
             if not (bad_dates or no_reach or blank_topics or partial_rows or dupes):
                 st.success("Não foram encontrados alertas básicos de integridade nos registros exibidos. Isso não garante que as métricas de origem estejam corretas.")
-        period_label=st.selectbox("Janela para validação",["Últimos 30 dias","Últimos 90 dias","Últimos 180 dias","Todo o histórico"],index=0)
-        period_days={"Últimos 30 dias":30,"Últimos 90 dias":90,"Últimos 180 dias":180,"Todo o histórico":None}[period_label]
+        period_label=st.selectbox("Janela para validação",["Últimos 7 dias","Últimos 30 dias","Últimos 90 dias","Últimos 180 dias","Todo o histórico"],index=0)
+        period_days={"Últimos 7 dias":7,"Últimos 30 dias":30,"Últimos 90 dias":90,"Últimos 180 dias":180,"Todo o histórico":None}[period_label]
         date_now=pd.Timestamp(date.today())
         stage_filter=st.selectbox("Filtrar etapa",["Todas","Descoberta","Consideração","Relacionamento","Conversão editorial"])
         format_filter=st.selectbox("Filtrar formato",["Todos"]+sorted([str(x) for x in df["format"].dropna().unique()]))
