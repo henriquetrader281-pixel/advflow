@@ -920,16 +920,18 @@ with tabs[2]:
                 st.error(str(exc))
         dynamic_models=st.session_state.get(models_key) or []
         fallback_models=[
-            {"id":"google/gemini-3.1-flash-image","name":"Google Nano Banana 2 / Gemini 3.1 Flash Image","supported_parameters":{"aspect_ratio":{"values":["1:1","2:3","3:4","4:5","9:16","16:9"]},"resolution":{"values":["1K","2K","4K"]}}},
+            {"id":"google/gemini-3.1-flash-image","name":"Google Nano Banana 2 / Gemini 3.1 Flash Image","supported_parameters":{"aspect_ratio":{"values":["1:1","2:3","3:4","4:5","9:16","16:9"]},"resolution":{"values":["1K","2K","4K"]},"input_references":True}},
+            {"id":"openai/gpt-image-2.5-sunburst","name":"OpenAI GPT Image 2.5 Sunburst","supported_parameters":{}},
+            {"id":"bytedance-seed/seedream-5-0-flash","name":"ByteDance Seedream 5.0 Flash","supported_parameters":{}},
             {"id":"bytedance-seed/seedream-4.5","name":"ByteDance Seedream 4.5","supported_parameters":{"aspect_ratio":{"values":["1:1","4:5","3:4","2:3","9:16","16:9"]}}},
             {"id":"openai/gpt-image-2","name":"OpenAI GPT Image 2","supported_parameters":{"aspect_ratio":{"values":["1:1","3:2","2:3","4:3","3:4","16:9","9:16"]},"quality":{"values":["auto","low","medium","high"]}}},
-            {"id":"qwen/qwen-image-3-pro","name":"Qwen Image 3 Pro","supported_parameters":{"aspect_ratio":{"values":["1:1","4:5","3:4","2:3","9:16","16:9"]},"resolution":{"values":["1K","2K"]}}}
+            {"id":"qwen/qwen-image-3-pro","name":"Qwen Image 3 Pro","supported_parameters":{"aspect_ratio":{"values":["1:1","4:5","3:4","2:3","9:16","16:9"]},"resolution":{"values":["1K","2K"]},"input_references":True}}
         ]
         model_list=dynamic_models or fallback_models
         model_ids=[m["id"] for m in model_list]
         recommended=secret("OPENROUTER_IMAGE_MODEL","google/gemini-3.1-flash-image")
         default_model=recommended if recommended in model_ids else model_ids[0]
-        chosen_model=st.selectbox("Modelo de imagem",model_ids,index=model_ids.index(default_model),format_func=lambda model_id: next((m.get("name",model_id)+" · "+model_id for m in model_list if m["id"]==model_id),model_id),key="openrouter_image_model")
+        chosen_model=st.selectbox("Modelo de imagem",model_ids,index=model_ids.index(default_model),format_func=lambda model_id: next((str(m.get("name") or model_id)+" · "+model_id for m in model_list if m["id"]==model_id),model_id),key="openrouter_image_model")
         model_metadata=next((m for m in model_list if m["id"]==chosen_model),{})
         custom_model=st.text_input("Outro identificador de modelo (opcional)",placeholder="Deixe vazio para usar o modelo selecionado")
         if custom_model.strip():
