@@ -766,49 +766,22 @@ def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image
 
 
 def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="Geral / interdisciplinar", slide_index=1, total_slides=1):
-    bg,ink,accent=PALETTES[palette];bg_rgb=_rgb(bg);ink_rgb=_rgb(ink);accent_rgb=_rgb(accent)
-    image=ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
-    iw,ih=image.size;ratio=1080/1350
-    if iw/ih>ratio:
-        crop_w=int(ih*ratio);left=max(0,(iw-crop_w)//2);image=image.crop((left,0,left+crop_w,ih))
-    else:
-        crop_h=int(iw/ratio);top=max(0,(ih-crop_h)//2);image=image.crop((0,top,iw,top+crop_h))
-    image=image.resize((1080,1350),Image.Resampling.LANCZOS).convert("RGBA")
-    overlay=Image.new("RGBA",(1080,1350),(0,0,0,0));od=ImageDraw.Draw(overlay)
-    for x in range(1080):
-        alpha=int(205*max(0.0,1-x/980)**1.45)
-        if alpha>0:od.line((x,0,x,1350),fill=(*bg_rgb,alpha),width=1)
-    image=Image.alpha_composite(image,overlay);d=ImageDraw.Draw(image)
-    def font(sz,bold=False):
-        paths=(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf"] if bold else ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"])
-        for path in paths:
-            try:return ImageFont.truetype(path,sz)
-            except Exception:pass
-        return ImageFont.load_default()
-    def wrapped(txt,x,y,ft,max_width,fill,leading,max_lines):
-        words=str(txt or "").split();lines=[];line=""
-        for word in words:
-            trial=(line+" "+word).strip()
-            if d.textbbox((0,0),trial,font=ft)[2]<=max_width or not line:line=trial
-            else:lines.append(line);line=word
-        if line:lines.append(line)
-        for line in lines[:max_lines]:d.text((x,y),line,font=ft,fill=fill);y+=leading
-        if len(lines)>max_lines:d.text((x,y),"…",font=ft,fill=fill);y+=leading
-        return y
-    d.rectangle((0,0,1080,15),fill=accent_rgb)
-    d.rounded_rectangle((52,45,730,102),radius=18,fill=(*bg_rgb,230),outline=accent_rgb,width=2)
-    d.text((72,62),f"{area.upper()} / CONTEÚDO INFORMATIVO"[:48],font=font(18,True),fill=ink_rgb)
-    d.text((58,149),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(18,True),fill=accent_rgb)
-    y=wrapped(title,56,194,font(61 if len(str(title))<38 else 51,True),825,ink_rgb,68,4)
-    d.rounded_rectangle((58,y+12,270,y+20),radius=4,fill=accent_rgb)
-    panel_top=min(max(y+44,330),620)
-    d.rounded_rectangle((34,panel_top,865,1135),radius=25,fill=(*bg_rgb,224),outline=(*accent_rgb,160),width=2)
-    wrapped(body,68,panel_top+35,font(29),750,ink_rgb,41,14)
-    d.line((58,1192,1020,1192),fill=(*accent_rgb,235),width=2)
-    d.text((58,1215),(signature or "CONTEÚDO INFORMATIVO")[:45],font=font(20,True),fill=ink_rgb)
-    d.text((58,1255),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=ink_rgb)
-    d.text((935,1300),f"{slide_index:02d}/{max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
-    out=io.BytesIO();image.convert("RGB").save(out,format="PNG",optimize=True);out.seek(0);return out
+    if not str(title or "").strip() or not str(body or "").strip():
+        raise ValueError("Título ou texto da arte vazio. Gere ou preencha o conteúdo antes de finalizar a imagem.")
+    import imagem
+    photo=ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
+    if photo.width < 200 or photo.height < 200:
+        raise ValueError("A imagem é pequena demais para uma arte profissional. Envie uma imagem com pelo menos 200 × 200 pixels.")
+    bg,ink,accent=PALETTES[palette]
+    # Cover uses the photo-led editorial composition; following slides use a clean typography-led layout.
+    focus=imagem.autofoco(photo) or (.5,.4)
+    rendered=imagem.render(
+        {"titulo":str(title).strip(),"texto":str(body).strip(),"kicker":str(area or "Conteúdo informativo")},
+        max(0,int(slide_index)-1),max(1,int(total_slides)),1350,
+        (bg,ink,accent),signature,"",photo if int(slide_index)==1 else None,
+        None,focus,"Centro"
+    )
+    out=io.BytesIO();rendered.save(out,format="PNG",optimize=True);out.seek(0);return out
 
 
 
