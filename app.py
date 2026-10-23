@@ -986,7 +986,7 @@ with tabs[1]:
             carousel_title = str(carousel_slide.get("titulo", f"Slide {carousel_idx+1}")).strip()
             carousel_body = str(carousel_slide.get("texto", "")).strip()
             carousel_visual = str(carousel_slide.get("visual", "")).strip()
-            carousel_prompt = f\"\"\"Gere SOMENTE UMA imagem final: SLIDE {carousel_idx+1} DE {len(carousel_slides)} de um carrossel profissional para Instagram.
+            carousel_prompt = f"""Gere SOMENTE UMA imagem final: SLIDE {carousel_idx+1} DE {len(carousel_slides)} de um carrossel profissional para Instagram.
 
 FORMATO E COMPOSIÇÃO
 - Vertical 4:5, 1080 × 1350 pixels; uma única arte individual, não uma página com várias miniaturas.
@@ -1012,10 +1012,10 @@ REGRAS
 - Preserve o português e a copy acima exatamente; não invente leis, artigos, prazos, estatísticas, citações nem informações.
 - Não adicione textos que não foram solicitados. Se o texto for longo, organizar melhor a tipografia sem cortar ou reescrever.
 - A arte deve combinar visualmente com os demais slides, mas conter somente o conteúdo do slide {carousel_idx+1}.
-- Entregue a imagem final agora, sem explicar o processo.\"\"\"
+- Entregue a imagem final agora, sem explicar o processo."""
             st.text_area("Prompt individual para o slide selecionado", value=carousel_prompt, height=300, key="gemini_carousel_individual_prompt")
             st.components.v1.html(
-                f\"\"\"<div style="font-family:sans-serif;padding:2px 0;">
+                f"""<div style="font-family:sans-serif;padding:2px 0;">
                 <button id="copy-advflow-slide-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt deste slide</button>
                 <span id="copy-advflow-slide-status" style="margin-left:10px;font-size:13px;"></span>
                 <script>
@@ -1026,7 +1026,7 @@ REGRAS
                   try {{ await navigator.clipboard.writeText(promptText); status.textContent = 'Copiado! Cole no Gemini.'; }}
                   catch (e) {{ status.textContent = 'Cópia automática indisponível; selecione e copie o texto acima.'; }}
                 }});
-                </script></div>\"\"\",
+                </script></div>""",
                 height=52,
             )
             st.link_button("Abrir Gemini para gerar este slide", "https://gemini.google.com/")
