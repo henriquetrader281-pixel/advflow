@@ -1013,7 +1013,7 @@ REGRAS
 - Não adicione textos que não foram solicitados. Se o texto for longo, organizar melhor a tipografia sem cortar ou reescrever.
 - A arte deve combinar visualmente com os demais slides, mas conter somente o conteúdo do slide {carousel_idx+1}.
 - Entregue a imagem final agora, sem explicar o processo."""
-            st.text_area("Prompt individual para o slide selecionado", value=carousel_prompt, height=300, key="gemini_carousel_individual_prompt")
+            st.text_area("Prompt individual para o slide selecionado", value=carousel_prompt, height=300, key=f"gemini_carousel_individual_prompt_{carousel_idx}")
             st.components.v1.html(
                 f"""<div style="font-family:sans-serif;padding:2px 0;">
                 <button id="copy-advflow-slide-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt deste slide</button>
