@@ -613,6 +613,12 @@ def _draw_icon(draw, kind, cx, cy, unit, ink, accent, light):
         line([(cx-u*.18,cy+u*.28),(cx+u*.18,cy+u*.28)],accent)
 
 def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None):
+    title = str(title or "").strip()
+    body = str(body or "").strip()
+    generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {slide_index}"}
+    if title.casefold().strip(" :.-") in generic_titles:
+        first_sentence = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)[0].strip()
+        title = first_sentence if first_sentence and len(first_sentence) <= 95 else "O que isso significa na prática?"
     bg,ink,accent=PALETTES[palette]
     bg_rgb=_rgb(bg); ink_rgb=_rgb(ink); accent_rgb=_rgb(accent)
     im=Image.new("RGB",(1080,1350),bg_rgb); d=ImageDraw.Draw(im)
