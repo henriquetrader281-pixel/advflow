@@ -678,14 +678,16 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
         body = str(slide.get("texto", "")).strip()
         visual = str(slide.get("visual", "")).strip()
         generic_title = title.casefold().strip(" :.-") in generic_titles or title.casefold().strip(" :.-") == f"slide {i}"
-        title_for_prompt = (
-            f"[RÓTULO INTERNO — NÃO EXIBIR: crie um título editorial curto e específico com base no texto do slide {i}]"
-            if generic_title else title
-        )
+        if generic_title:
+            title_for_prompt = f"Crie um título editorial curto e específico com base no texto do slide {i}. O rótulo interno “{title}” não é título final e não pode aparecer na arte."
+            image_title_for_prompt = f"Crie e use um título editorial próprio para o slide {i}; nunca escreva “{title}” como título visível."
+        else:
+            title_for_prompt = title
+            image_title_for_prompt = title
         text_copy.append(f"SLIDE {i}\nTÍTULO EDITORIAL: {title_for_prompt}\nCOPY TEXTUAL: {body}")
         image_copy.append(
-            f"ARTE/IMAGEM {i}\nTEMA: {title_for_prompt}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
-            f"TEXTO QUE DEVE APARECER NA ARTE: {title_for_prompt}\nTEXTO DE APOIO: {body}"
+            f"ARTE/IMAGEM {i}\nTEMA/TÍTULO: {image_title_for_prompt}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
+            f"TEXTO QUE DEVE APARECER NA ARTE: {image_title_for_prompt}\nTEXTO DE APOIO: {body}"
         )
     roteiro = draft.get("roteiro") or []
     video_lines = []
