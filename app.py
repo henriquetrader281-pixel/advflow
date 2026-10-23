@@ -948,6 +948,26 @@ with tabs[1]:
             palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
         )
         st.text_area("Briefing completo — copy textual + copy de imagem/vídeo", value=gemini_brief, height=420, key="gemini_full_piece_brief")
+        st.components.v1.html(
+            f"""<div style="font-family: sans-serif; padding: 2px 0;">
+            <button id="copy-advflow-brief" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">
+            📋 Copiar briefing completo</button>
+            <span id="copy-advflow-status" style="margin-left:10px;font-size:13px;"></span>
+            <script>
+            const brief = {json.dumps(gemini_brief, ensure_ascii=False)};
+            const btn = document.getElementById('copy-advflow-brief');
+            const status = document.getElementById('copy-advflow-status');
+            btn.addEventListener('click', async () => {{
+              try {{
+                await navigator.clipboard.writeText(brief);
+                status.textContent = 'Copiado! Agora cole no Gemini.';
+              }} catch (e) {{
+                status.textContent = 'Não foi possível copiar automaticamente. Selecione o texto acima e copie.';
+              }}
+            }});
+            </script></div>""",
+            height=52,
+        )
         st.download_button("Baixar briefing completo (.txt)", gemini_brief.encode("utf-8"), "advflow_briefing_gemini.txt", "text/plain", key="download_gemini_full_piece_brief")
         st.link_button("Abrir Gemini para criar a peça", "https://gemini.google.com/", type="primary")
         st.info("O briefing contém duas partes separadas: copy textual e direção criativa de imagem/vídeo. O link abre o Gemini, mas você precisa copiar e colar o briefing. Se a geração de vídeo não estiver disponível na sua conta/conversa, o prompt pede ao Gemini um plano de produção cena a cena em vez de afirmar que gerou o vídeo.")
