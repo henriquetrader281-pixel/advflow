@@ -586,72 +586,85 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
 def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium"):
-    """Monta um briefing integral para o Gemini criar a peça final, usando a copy do agente como fonte."""
+    """Separa copy textual, direção visual de imagem e instruções de vídeo para o Gemini."""
     slides = draft.get("slides") or []
-    slide_lines = []
+    text_copy, image_copy = [], []
     for i, slide in enumerate(slides, 1):
-        slide_lines.append(
-            f"SLIDE {i}\nTÍTULO: {str(slide.get('titulo','')).strip()}\n"
-            f"TEXTO EXATO: {str(slide.get('texto','')).strip()}\n"
-            f"DIREÇÃO VISUAL: {str(slide.get('visual','')).strip()}"
+        title = str(slide.get("titulo", "")).strip()
+        body = str(slide.get("texto", "")).strip()
+        visual = str(slide.get("visual", "")).strip()
+        text_copy.append(f"SLIDE {i}\nTÍTULO/TEXTO: {title}\nCOPY TEXTUAL: {body}")
+        image_copy.append(
+            f"ARTE/IMAGEM {i}\nTEMA: {title}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
+            f"TEXTO QUE DEVE APARECER NA ARTE: {title}\nTEXTO DE APOIO: {body}"
         )
     roteiro = draft.get("roteiro") or []
-    roteiro_text = json.dumps(roteiro, ensure_ascii=False, indent=2) if roteiro else "Não se aplica."
+    video_lines = []
+    for i, scene in enumerate(roteiro, 1):
+        if isinstance(scene, dict):
+            video_lines.append(
+                f"CENA {i}\nCENA/OBJETIVO: {scene.get('cena', '')}\nFALA/NARRAÇÃO: {scene.get('fala', '')}\n"
+                f"VISUAL/ENQUADRAMENTO: {scene.get('visual', '')}\nTEXTO NA TELA: {scene.get('texto_na_tela', scene.get('texto', ''))}"
+            )
+        else:
+            video_lines.append(f"CENA {i}: {scene}")
     caption = str(draft.get("legenda", "")).strip()
     hashtags = " ".join(draft.get("hashtags", [])) if isinstance(draft.get("hashtags", []), list) else str(draft.get("hashtags", ""))
     sources = "\n".join("- " + str(x) for x in draft.get("fontes_para_conferir", [])) or "Nenhuma fonte indicada pelo agente; não invente fontes."
-    return f"""Você é diretor de arte e designer editorial sênior. Crie a PEÇA VISUAL FINAL pronta para publicação, não apenas um fundo nem uma descrição de imagem.
+    fmt_lower = str(fmt).lower()
+    video_mode = "REEL/VÍDEO: crie um vídeo vertical 9:16 com ritmo claro, cenas, movimentos de câmera, transições discretas, fala/narração e textos na tela alinhados ao roteiro. Se não for possível gerar vídeo diretamente, entregue um plano de produção cena a cena e os prompts visuais prontos para cada cena."
+    image_mode = "IMAGEM/CARROSSEL: crie artes finais completas, não apenas fundos. Para carrossel, uma imagem separada por slide, com sistema visual consistente e textos legíveis."
+    if "reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower:
+        media_instructions = video_mode
+    elif "legenda" in fmt_lower:
+        media_instructions = "FORMATO LEGENDA: priorize a copy textual e ofereça uma proposta visual opcional relacionada ao tema."
+    elif "estático" in fmt_lower or "estatico" in fmt_lower:
+        media_instructions = "POST ESTÁTICO: crie uma arte final única com a copy textual e a direção visual específica."
+    else:
+        media_instructions = image_mode
+    return f"""Você é diretor criativo, designer editorial e produtor audiovisual sênior para conteúdo jurídico brasileiro. Use o conteúdo abaixo para produzir a copy e a peça de mídia solicitada.
 
-OBJETIVO
-Criar {fmt.lower()} para Instagram, com design profissional, alta legibilidade, hierarquia tipográfica clara, composição refinada e unidade visual. Use proporção vertical 4:5 para posts/carrosséis; para Reel, use 9:16. Entregue cada slide como uma arte completa e separada, na ordem correta. Se não conseguir entregar várias imagens de uma vez, produza o primeiro slide e aguarde meu pedido para continuar mantendo exatamente o mesmo sistema visual.
+ENTREGA DESEJADA
+{media_instructions}
 
 IDENTIDADE E DIREÇÃO
 Escritório/marca: {office or "não informado"}
 Identificação profissional/OAB: {oab or "não informado"}
-Paleta desejada: {palette_name}
+Paleta: {palette_name}
 Estilo visual: {visual_style}
 Público-alvo: {audience}
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
 Tom de voz: {draft.get("tom_de_voz", "sóbrio, didático e profissional")}
+Título geral: {draft.get("titulo", "Conteúdo jurídico")}
+Resumo estratégico: {draft.get("resumo_estrategico", "")}
 
-REGRAS OBRIGATÓRIAS PARA A COPY
-- A copy abaixo é a fonte principal. Preserve o sentido jurídico e todos os avisos relevantes.
-- Reproduza com precisão os títulos e textos fornecidos; não invente leis, artigos, prazos, estatísticas, decisões, nomes ou fontes.
-- Não substitua texto jurídico por frases genéricas, não acrescente promessas de resultado e não crie pressão comercial.
-- Se o texto não couber, reorganize o layout e a tipografia; não elimine trechos importantes sem me consultar.
-- Respeite a publicidade informativa, sóbria e discreta da advocacia brasileira e as regras aplicáveis da OAB.
-- Use português brasileiro correto, acentos e pontuação corretos.
-- Evite clichês visuais jurídicos (martelo, balança ou coluna clássica) salvo se forem realmente necessários ao conceito.
-- Não coloque marcas d'água, logotipos inventados nem elementos de identidade não fornecidos.
-- A legenda e as hashtags são metadados para a publicação; não precisam ser desenhadas dentro da imagem.
-- Revise a arte final para verificar ortografia, legibilidade em tela de celular, margens e consistência entre slides.
+COPY 1 — TEXTO EDITORIAL (legenda, título, slides e narração)
+{chr(10).join(text_copy) if text_copy else "Não há slides estruturados; use apenas os campos fornecidos e não invente fatos."}
 
-TÍTULO GERAL
-{draft.get("titulo", "Conteúdo jurídico")}
+COPY 2 — DIREÇÃO CRIATIVA PARA IMAGEM/ARTE (conceito visual, composição, cena e texto a aplicar)
+{chr(10).join(image_copy) if image_copy else "Não há direções visuais estruturadas; desenvolva uma proposta visual específica baseada no tema."}
 
-RESUMO ESTRATÉGICO
-{draft.get("resumo_estrategico", "")}
+COPY 2B — DIREÇÃO PARA VÍDEO (cenas, fala/narração, enquadramento, movimento e texto na tela)
+{chr(10).join(video_lines) if video_lines else "Não há roteiro de vídeo estruturado. Se o formato solicitado for vídeo/Reel, crie um plano de cenas com base somente na copy editorial acima e sinalize qualquer suposição."}
 
-COPY DOS SLIDES — PRESERVAR
-{chr(10).join(slide_lines) if slide_lines else "Não há slides estruturados. Use o título e o gancho abaixo sem inventar conteúdo."}
-
-GANCHO/CONTEÚDO EXTRA
-{draft.get("gancho", "")}
-
-ROTEIRO, SE APLICÁVEL
-{roteiro_text}
-
-LEGENDA
+GANCHO: {draft.get("gancho", "")}
+CTA EDUCATIVA: {draft.get("cta_educativa", "")}
+LEGENDA PARA PUBLICAÇÃO (não precisa ser inserida na imagem):
 {caption}
-
-HASHTAGS
-{hashtags}
-
-FONTES PARA CONFERÊNCIA (não inventar outras)
+HASHTAGS: {hashtags}
+FONTES PARA CONFERIR (não inventar fontes):
 {sources}
 
-INSTRUÇÃO FINAL
-Crie uma arte completa, pronta para publicação, com tipografia e textos integrados ao design. Priorize clareza, leitura em celular, composição premium e consistência visual. Antes de finalizar, confira a fidelidade de cada texto à copy original. Se algum texto não puder ser renderizado com precisão, informe isso claramente em vez de inventar ou deformar palavras.
+REGRAS IMPORTANTES
+- São duas entregas diferentes: COPY TEXTUAL e COPY/DIREÇÃO DE MÍDIA. Não misture nem substitua uma pela outra.
+- Preserve o sentido jurídico e reproduza os textos fornecidos com precisão. Não invente leis, artigos, prazos, estatísticas, decisões, nomes ou fontes.
+- Para imagens, gere a arte final com tipografia e texto integrado; não entregue apenas um fundo, salvo se eu pedir explicitamente fundo.
+- Para vídeo, siga o roteiro e a duração/formato pedidos; se o Gemini não puder renderizar vídeo nesta conversa, forneça um plano de produção e prompts cena a cena, sem afirmar que o vídeo foi gerado.
+- Não remova texto importante para fazê-lo caber; reorganize a composição ou sinalize o problema.
+- Respeite a publicidade informativa e discreta da advocacia e as regras aplicáveis da OAB. Sem promessa de resultado, pressão comercial ou captação indevida.
+- Use português brasileiro correto, acentuação correta e texto legível em tela de celular.
+- Não invente logotipo, dados de escritório ou identificação OAB.
+- Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
 
 def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
@@ -926,18 +939,18 @@ with tabs[1]:
             st.success("Rascunho salvo.")
         st.download_button("Baixar conteúdo JSON",json.dumps(d,ensure_ascii=False,indent=2),"advflow_conteudo.json","application/json")
         st.divider()
-        st.markdown("#### Criar a peça completa no Gemini")
-        st.caption("Usa a copy já produzida pelo agente para pedir ao Gemini a arte final com texto, layout e identidade visual. O Gemini abre em outra aba; confirme o briefing antes de enviar.")
+        st.markdown("#### Enviar as duas copies ao Gemini: texto + imagem/vídeo")
+        st.caption("O briefing separa a copy textual da direção criativa de imagem/vídeo. Para Reel, inclui cenas, fala/narração e orientação visual; para carrossel, especifica cada arte.")
         gemini_brief = build_gemini_full_piece_prompt(
             d, fmt=fmt if "fmt" in locals() else str(d.get("formato", "Carrossel")),
             audience=str(d.get("publico", audience if "audience" in locals() else "público geral")),
             office=office, oab=oab,
             palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
         )
-        st.text_area("Briefing completo para o Gemini", value=gemini_brief, height=320, key="gemini_full_piece_brief")
+        st.text_area("Briefing completo — copy textual + copy de imagem/vídeo", value=gemini_brief, height=420, key="gemini_full_piece_brief")
         st.download_button("Baixar briefing completo (.txt)", gemini_brief.encode("utf-8"), "advflow_briefing_gemini.txt", "text/plain", key="download_gemini_full_piece_brief")
         st.link_button("Abrir Gemini para criar a peça", "https://gemini.google.com/", type="primary")
-        st.info("O Gemini não permite garantir que um link comum abra com o prompt já enviado. Copie o briefing acima e cole na conversa do Gemini. Depois, importe a arte final no AdvFlow para manter o fluxo de revisão.")
+        st.info("O briefing contém duas partes separadas: copy textual e direção criativa de imagem/vídeo. O link abre o Gemini, mas você precisa copiar e colar o briefing. Se a geração de vídeo não estiver disponível na sua conta/conversa, o prompt pede ao Gemini um plano de produção cena a cena em vez de afirmar que gerou o vídeo.")
 
 with tabs[2]:
     st.subheader("Estúdio visual | Gemini Plus, OpenRouter e AdvFlow")
