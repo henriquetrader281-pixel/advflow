@@ -585,6 +585,75 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         except Exception:pass
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
+def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium"):
+    """Monta um briefing integral para o Gemini criar a peça final, usando a copy do agente como fonte."""
+    slides = draft.get("slides") or []
+    slide_lines = []
+    for i, slide in enumerate(slides, 1):
+        slide_lines.append(
+            f"SLIDE {i}\nTÍTULO: {str(slide.get('titulo','')).strip()}\n"
+            f"TEXTO EXATO: {str(slide.get('texto','')).strip()}\n"
+            f"DIREÇÃO VISUAL: {str(slide.get('visual','')).strip()}"
+        )
+    roteiro = draft.get("roteiro") or []
+    roteiro_text = json.dumps(roteiro, ensure_ascii=False, indent=2) if roteiro else "Não se aplica."
+    caption = str(draft.get("legenda", "")).strip()
+    hashtags = " ".join(draft.get("hashtags", [])) if isinstance(draft.get("hashtags", []), list) else str(draft.get("hashtags", ""))
+    sources = "\n".join("- " + str(x) for x in draft.get("fontes_para_conferir", [])) or "Nenhuma fonte indicada pelo agente; não invente fontes."
+    return f"""Você é diretor de arte e designer editorial sênior. Crie a PEÇA VISUAL FINAL pronta para publicação, não apenas um fundo nem uma descrição de imagem.
+
+OBJETIVO
+Criar {fmt.lower()} para Instagram, com design profissional, alta legibilidade, hierarquia tipográfica clara, composição refinada e unidade visual. Use proporção vertical 4:5 para posts/carrosséis; para Reel, use 9:16. Entregue cada slide como uma arte completa e separada, na ordem correta. Se não conseguir entregar várias imagens de uma vez, produza o primeiro slide e aguarde meu pedido para continuar mantendo exatamente o mesmo sistema visual.
+
+IDENTIDADE E DIREÇÃO
+Escritório/marca: {office or "não informado"}
+Identificação profissional/OAB: {oab or "não informado"}
+Paleta desejada: {palette_name}
+Estilo visual: {visual_style}
+Público-alvo: {audience}
+Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
+Tom de voz: {draft.get("tom_de_voz", "sóbrio, didático e profissional")}
+
+REGRAS OBRIGATÓRIAS PARA A COPY
+- A copy abaixo é a fonte principal. Preserve o sentido jurídico e todos os avisos relevantes.
+- Reproduza com precisão os títulos e textos fornecidos; não invente leis, artigos, prazos, estatísticas, decisões, nomes ou fontes.
+- Não substitua texto jurídico por frases genéricas, não acrescente promessas de resultado e não crie pressão comercial.
+- Se o texto não couber, reorganize o layout e a tipografia; não elimine trechos importantes sem me consultar.
+- Respeite a publicidade informativa, sóbria e discreta da advocacia brasileira e as regras aplicáveis da OAB.
+- Use português brasileiro correto, acentos e pontuação corretos.
+- Evite clichês visuais jurídicos (martelo, balança ou coluna clássica) salvo se forem realmente necessários ao conceito.
+- Não coloque marcas d'água, logotipos inventados nem elementos de identidade não fornecidos.
+- A legenda e as hashtags são metadados para a publicação; não precisam ser desenhadas dentro da imagem.
+- Revise a arte final para verificar ortografia, legibilidade em tela de celular, margens e consistência entre slides.
+
+TÍTULO GERAL
+{draft.get("titulo", "Conteúdo jurídico")}
+
+RESUMO ESTRATÉGICO
+{draft.get("resumo_estrategico", "")}
+
+COPY DOS SLIDES — PRESERVAR
+{chr(10).join(slide_lines) if slide_lines else "Não há slides estruturados. Use o título e o gancho abaixo sem inventar conteúdo."}
+
+GANCHO/CONTEÚDO EXTRA
+{draft.get("gancho", "")}
+
+ROTEIRO, SE APLICÁVEL
+{roteiro_text}
+
+LEGENDA
+{caption}
+
+HASHTAGS
+{hashtags}
+
+FONTES PARA CONFERÊNCIA (não inventar outras)
+{sources}
+
+INSTRUÇÃO FINAL
+Crie uma arte completa, pronta para publicação, com tipografia e textos integrados ao design. Priorize clareza, leitura em celular, composição premium e consistência visual. Antes de finalizar, confira a fidelidade de cada texto à copy original. Se algum texto não puder ser renderizado com precisão, informe isso claramente em vez de inventar ou deformar palavras.
+"""
+
 def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
     bg,ink,accent=palette
     styles={
@@ -856,6 +925,19 @@ with tabs[1]:
             with db() as c:c.execute("INSERT INTO pieces(created,subject,format,content,status,user_id) VALUES(?,?,?,?,?,?)",(datetime.now().isoformat(timespec="seconds"),d.get("titulo",subject),fmt,json.dumps(d,ensure_ascii=False),"Rascunho",user_id))
             st.success("Rascunho salvo.")
         st.download_button("Baixar conteúdo JSON",json.dumps(d,ensure_ascii=False,indent=2),"advflow_conteudo.json","application/json")
+        st.divider()
+        st.markdown("#### Criar a peça completa no Gemini")
+        st.caption("Usa a copy já produzida pelo agente para pedir ao Gemini a arte final com texto, layout e identidade visual. O Gemini abre em outra aba; confirme o briefing antes de enviar.")
+        gemini_brief = build_gemini_full_piece_prompt(
+            d, fmt=fmt if "fmt" in locals() else str(d.get("formato", "Carrossel")),
+            audience=str(d.get("publico", audience if "audience" in locals() else "público geral")),
+            office=office, oab=oab,
+            palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
+        )
+        st.text_area("Briefing completo para o Gemini", value=gemini_brief, height=320, key="gemini_full_piece_brief")
+        st.download_button("Baixar briefing completo (.txt)", gemini_brief.encode("utf-8"), "advflow_briefing_gemini.txt", "text/plain", key="download_gemini_full_piece_brief")
+        st.link_button("Abrir Gemini para criar a peça", "https://gemini.google.com/", type="primary")
+        st.info("O Gemini não permite garantir que um link comum abra com o prompt já enviado. Copie o briefing acima e cole na conversa do Gemini. Depois, importe a arte final no AdvFlow para manter o fluxo de revisão.")
 
 with tabs[2]:
     st.subheader("Estúdio visual | Gemini Plus, OpenRouter e AdvFlow")
