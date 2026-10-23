@@ -147,9 +147,51 @@ user_id = current_user["username"]
 
 SYSTEM = """Você é diretor de criação e estrategista sênior de conteúdo para advocacia brasileira. Produza copy editorial de nível profissional: específica, fluida, persuasiva pelo valor informativo (nunca por pressão comercial), com raciocínio progressivo e linguagem acessível para o público solicitado. Evite clichês, introduções vazias, repetição entre slides, frases genéricas do tipo 'é importante conhecer', perguntas artificiais, promessas de resultado, sensacionalismo, comparação, autoengrandecimento, captação de clientela e estímulo ao litígio. Não invente leis, artigos, prazos, estatísticas, decisões, fatos ou fontes. Quando o contexto estiver incompleto, use formulação condicional e indique o que precisa ser confirmado. O texto deve conter uma ideia concreta por slide, título editorial curto, parágrafo objetivo e transição lógica até a conclusão. Adeque profundidade, vocabulário, exemplos e objeções à área e ao segmento escolhidos. Diferencie informação geral de aconselhamento individual. Respeite a publicidade informativa, sóbria e discreta exigida pela OAB; não use CTA que induza contratação. A etapa de funil define intenção editorial, não uma promessa de conversão comercial.
 
+REVISÃO OBRIGATÓRIA ANTES DE ENTREGAR:
+- Revise todo o conteúdo em português brasileiro: ortografia, acentuação, concordância, regência, pontuação, sintaxe, coesão e naturalidade.
+- Revise a terminologia jurídica: use o termo técnico correto para o instituto descrito; não trate conceitos diferentes como sinônimos nem substitua termos jurídicos por palavras vagas.
+- Evite juridiquês desnecessário. Quando um termo técnico for indispensável, use-o corretamente e explique-o em linguagem simples na primeira ocorrência, sem perder precisão.
+- Distinga fato, regra geral, exceção, interpretação e hipótese. Não transforme uma possibilidade em certeza nem apresente orientação geral como conclusão aplicável a todo caso.
+- Não invente leis, artigos, prazos, súmulas, precedentes, requisitos ou fontes. Quando a precisão jurídica depender de confirmação em fonte primária atualizada, sinalize isso claramente em fontes_para_conferir e checklist_revisao.
+- Não reescreva de forma que mude o sentido jurídico. Se houver ambiguidade ou informação insuficiente, sinalize o trecho em vez de adivinhar.
+- Confira também a consistência dos termos entre slides, roteiro, legenda, CTA e direção visual. A revisão linguística não equivale à validação de vigência legal ou a um parecer jurídico.
+
 Retorne JSON válido com as chaves:
 titulo, promessa_editorial, angulo_editorial, publico, area_direito, etapa_funil, resumo_estrategico, gancho, slides (lista de objetos titulo/texto/visual/objetivo_do_slide), roteiro (lista de cena/fala/visual), legenda, cta_educativa, hashtags, fontes_para_conferir, checklist_revisao.
+No checklist_revisao, inclua itens sobre português brasileiro, precisão e consistência terminológica jurídica, clareza para o público e fundamentos que precisam de conferência em fonte primária.
 Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação.""" 
+
+LINGUISTIC_REVIEW_SYSTEM = """Você é revisor sênior de português brasileiro e terminologia jurídica brasileira, com rigor editorial. Analise a peça e apresente uma revisão cuidadosa, sem inventar base legal nem se passar por parecer jurídico.
+Verifique ortografia, acentuação, gramática, concordância, regência, pontuação, sintaxe, naturalidade, clareza, coesão e consistência de termos entre título, slides, roteiro e legenda.
+Confira se cada termo jurídico está empregado no sentido correto e se há confusão entre conceitos distintos. Evite juridiquês gratuito, mas não simplifique a ponto de alterar o instituto jurídico. Explique em linguagem acessível os termos técnicos inevitáveis.
+Não declare que uma lei, artigo, prazo ou precedente está vigente/correto sem fonte confiável incluída no material. Separe falhas linguísticas de questões jurídicas que precisam ser verificadas. Não altere fatos, requisitos, direitos, obrigações, prazos, números ou referências sem suporte. Caso exista dúvida de mérito, preserve o sentido, sinalize o trecho e indique a fonte primária que deve ser consultada.
+Retorne apenas JSON válido neste formato:
+{
+  "resumo_da_revisao": "síntese breve",
+  "problemas_identificados": [
+    {"trecho_original":"trecho literal ou descrição objetiva","tipo":"Português|Terminologia jurídica|Clareza|Consistência|Verificação jurídica","motivo":"por que precisa de ajuste","sugestao":"proposta específica"}
+  ],
+  "pontos_que_exigem_fonte": ["questões jurídicas factuais que não podem ser confirmadas apenas pela redação"],
+  "versao_revisada": {
+    "titulo":"...",
+    "promessa_editorial":"...",
+    "angulo_editorial":"...",
+    "publico":"...",
+    "area_direito":"...",
+    "etapa_funil":"...",
+    "resumo_estrategico":"...",
+    "gancho":"...",
+    "slides":[{"titulo":"...","texto":"...","visual":"...","objetivo_do_slide":"..."}],
+    "roteiro":[{"cena":"...","fala":"...","visual":"..."}],
+    "legenda":"...",
+    "cta_educativa":"...",
+    "hashtags":["..."],
+    "fontes_para_conferir":["..."],
+    "checklist_revisao":["..."]
+  }
+}
+Inclua na versão revisada todas as chaves acima, preservando a estrutura e quantidade de slides/cenas sempre que possível. Corrija erros claros; para pontos juridicamente incertos, não invente uma solução: mantenha a redação cautelosa e sinalize o que exige confirmação. Se não houver problema, informe isso no resumo, mas não alegue que houve validação de legislação.""" 
+
 PATTERNS=[
 (r"garantimos|garantia de resultado|causa ganha|resultado garantido","Possível promessa de resultado."),
 (r"melhor advogado|número\\s*1|líder absoluto|maior escritório","Possível superlativo ou comparação."),
@@ -246,7 +288,7 @@ def local_draft(subject, fmt, audience, goal, area="Geral / interdisciplinar", f
         "publico":audience,"area_direito":area,"etapa_funil":stage,"resumo_estrategico":f"{goal}: conteúdo {stage.lower()}, em tom {tone.lower()}, com foco em {audience}.",
         "gancho":texts[0],"slides":slides,"roteiro":script,"legenda":caption,"cta_educativa":cta,
         "hashtags":hashtags,"fontes_para_conferir":["Texto legal oficial e atualizado aplicável ao tema","Página oficial do tribunal ou órgão competente; conferir data, contexto e inteiro teor da decisão, se houver"],
-        "checklist_revisao":["Confirmar todos os fundamentos jurídicos em fonte primária","Revisar a clareza para o público escolhido","Conferir sobriedade e caráter informativo conforme as regras da OAB"]
+        "checklist_revisao":["Revisar ortografia, acentuação, gramática e pontuação em português brasileiro","Conferir o emprego correto e consistente dos termos jurídicos; explicar o juridiquês indispensável em linguagem simples","Confirmar todos os fundamentos jurídicos em fonte primária atualizada","Revisar a clareza para o público escolhido","Conferir sobriedade e caráter informativo conforme as regras da OAB"]
     }
 def error_detail(response):
     try:
@@ -273,7 +315,7 @@ def model_candidates(configured, defaults):
             candidates.append(item)
     return candidates
 
-def call_gemini(prompt):
+def call_gemini(prompt, system_prompt=SYSTEM):
     key=secret("GEMINI_API_KEY")
     if not key: raise RuntimeError("GEMINI_API_KEY não configurada nos Secrets do Streamlit")
     configured=secret("GEMINI_MODEL","gemini-3.8-flash")
@@ -282,7 +324,7 @@ def call_gemini(prompt):
     for model in candidates:
         try:
             r=requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",params={"key":key},
-              json={"systemInstruction":{"parts":[{"text":SYSTEM}]},"contents":[{"role":"user","parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}},timeout=60)
+              json={"systemInstruction":{"parts":[{"text":system_prompt}]},"contents":[{"role":"user","parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}},timeout=60)
             if not r.ok:
                 detail=error_detail(r)
                 failures.append(f"{model}: HTTP {r.status_code} ({detail})")
@@ -296,7 +338,7 @@ def call_gemini(prompt):
             failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
     raise RuntimeError("Nenhum modelo Gemini funcionou. " + " | ".join(failures[:4]))
 
-def call_groq(prompt):
+def call_groq(prompt, system_prompt=SYSTEM):
     key=secret("GROQ_API_KEY")
     if not key: raise RuntimeError("GROQ_API_KEY não configurada nos Secrets do Streamlit")
     configured=secret("GROQ_MODEL","openai/gpt-oss-120b")
@@ -305,7 +347,7 @@ def call_groq(prompt):
     for model in candidates:
         try:
             r=requests.post("https://api.groq.com/openai/v1/chat/completions",headers={"Authorization":"Bearer "+key},
-              json={"model":model,"temperature":0.55,"response_format":{"type":"json_object"},"messages":[{"role":"system","content":SYSTEM},{"role":"user","content":prompt}]},timeout=60)
+              json={"model":model,"temperature":0.55,"response_format":{"type":"json_object"},"messages":[{"role":"system","content":system_prompt},{"role":"user","content":prompt}]},timeout=60)
             if not r.ok:
                 detail=error_detail(r)
                 failures.append(f"{model}: HTTP {r.status_code} ({detail})")
@@ -330,7 +372,7 @@ def parse_json_response(content):
             return json.loads(text_value[start:end+1])
         raise RuntimeError("O modelo não retornou um objeto JSON válido. Tente outro modelo no OpenRouter.")
 
-def call_openrouter(prompt):
+def call_openrouter(prompt, system_prompt=SYSTEM):
     key=secret("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit")
@@ -352,7 +394,7 @@ def call_openrouter(prompt):
                     "temperature":0.55,
                     "max_tokens":6500,
                     "messages":[
-                        {"role":"system","content":SYSTEM},
+                        {"role":"system","content":system_prompt},
                         {"role":"user","content":prompt+"\n\nRetorne apenas um JSON válido, sem markdown ou comentários."}
                     ]
                 },
@@ -418,6 +460,39 @@ def generate(subject, fmt, audience, goal, details="", area="Geral / interdiscip
     result=local_draft(subject,fmt,audience,goal,area,funnel_stage,tone,angle,requested_cta,details)
     result["aviso"]="IA externa indisponível; estrutura local usada. "+" | ".join(errors)
     return result,"Modelo local"
+
+def review_language_and_legal_precision(draft, preferred_provider=""):
+    """Executa uma segunda revisão por IA, sem substituir o rascunho automaticamente."""
+    review_input = json.dumps({
+        "conteudo_gerado": {k: v for k, v in draft.items() if not str(k).startswith("_")},
+        "instrucoes": [
+            "Revisar todo o português brasileiro e a terminologia jurídica.",
+            "Preservar sentido e fatos; não inventar fundamentos legais.",
+            "Separar correções linguísticas de questões que exigem consulta a fonte primária.",
+            "Entregar JSON no esquema definido pelo revisor."
+        ]
+    }, ensure_ascii=False)
+    prompt = "Faça uma segunda revisão editorial e de precisão terminológica jurídica deste conteúdo. Produza o JSON de revisão solicitado.\n\n" + review_input
+    providers = {
+        "Gemini": call_gemini,
+        "Groq (alternativo)": call_groq,
+        "OpenRouter (alternativo)": call_openrouter
+    }
+    order = []
+    if preferred_provider in providers:
+        order.append((preferred_provider, providers[preferred_provider]))
+    order.extend((name, fn) for name, fn in providers.items() if name not in [n for n, _ in order])
+    errors = []
+    for name, fn in order:
+        try:
+            result = fn(prompt, system_prompt=LINGUISTIC_REVIEW_SYSTEM)
+            if not isinstance(result, dict) or not isinstance(result.get("versao_revisada"), dict):
+                raise ValueError("A IA não retornou a versão revisada no formato esperado.")
+            result["_provedor_revisao"] = name
+            return result
+        except Exception as exc:
+            errors.append(name + ": " + str(exc))
+    raise RuntimeError("Não foi possível executar a revisão com as IAs configuradas. " + " | ".join(errors[:3]))
 
 PALETTES={
     "Azul-marinho & champanhe":("#F5F1E8","#172842","#B79B61"),
@@ -662,6 +737,7 @@ REGRAS IMPORTANTES
 - Para vídeo, priorize Reel final de 30–45 segundos em 9:16; não aceite clipe curto ou horizontal como entrega final. Se houver limite de duração, divida em clipes numerados que somem a duração pedida. Não acelere nem corte a narração para caber; preserve áreas seguras e confira cortes, ritmo e legibilidade. Se o Gemini não puder renderizar vídeo nesta conversa, forneça um plano de produção e prompts cena a cena, sem afirmar que o vídeo foi gerado.
 - Não remova texto importante para fazê-lo caber; reorganize a composição ou sinalize o problema.
 - Respeite a publicidade informativa e discreta da advocacia e as regras aplicáveis da OAB. Sem promessa de resultado, pressão comercial ou captação indevida.
+- Revise o português brasileiro antes de produzir as peças: acentuação, ortografia, concordância, regência, pontuação e naturalidade. Preserve a terminologia jurídica correta, evite juridiquês desnecessário e explique termos técnicos quando isso couber na copy.
 - Use português brasileiro correto, acentuação correta e texto legível em tela de celular.
 - Não invente logotipo, dados de escritório ou identificação OAB.
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
@@ -694,6 +770,7 @@ Direção visual: {visual or "Criar uma metáfora visual editorial específica p
 
 REGRAS
 - Produza a arte final pronta para publicação, não apenas descrição ou fundo.
+- Revise ortografia, acentuação, concordância, regência e pontuação antes de renderizar a arte. Preserve a terminologia jurídica correta e não troque termos técnicos por sinônimos imprecisos.
 - Preserve exatamente o sentido e o português da copy. Não invente leis, artigos, prazos, estatísticas, decisões ou fontes.
 - Não acrescente textos não solicitados. Se o texto for longo, reorganize a tipografia, sem cortar palavras ou omitir informações.
 - A arte deve pertencer visualmente ao mesmo conjunto, mas conter somente o conteúdo do slide {slide_number}.
@@ -1001,6 +1078,63 @@ with tabs[1]:
         st.write("**Hashtags:**"," ".join(d.get("hashtags",[])))
         st.write("**Fontes para conferir:**")
         for s in d.get("fontes_para_conferir",[]):st.write("- "+str(s))
+
+        st.divider()
+        st.markdown("#### Revisão de português e terminologia jurídica")
+        st.caption("Faça uma segunda leitura por IA para identificar erros de português, termos jurídicos imprecisos, juridiquês excessivo e pontos que precisam de fonte oficial. A revisão não substitui a conferência da legislação nem a análise de um profissional.")
+        if st.button("Revisar português e precisão jurídica", type="primary", key="run_language_legal_review"):
+            try:
+                with st.spinner("Revisando linguagem, terminologia e consistência jurídica…"):
+                    review_result = review_language_and_legal_precision(
+                        d, preferred_provider=st.session_state.get("draft_provider", "")
+                    )
+                st.session_state["language_legal_review"] = review_result
+                st.session_state["language_legal_review_for_title"] = str(d.get("titulo", ""))
+            except Exception as exc:
+                st.error("A revisão não foi concluída: " + str(exc))
+        review_result = st.session_state.get("language_legal_review")
+        if review_result and st.session_state.get("language_legal_review_for_title") == str(d.get("titulo", "")):
+            st.markdown("**Resultado da revisão**")
+            st.caption("Revisor: " + str(review_result.get("_provedor_revisao", "IA")))
+            st.write(review_result.get("resumo_da_revisao", "A revisão foi concluída; confira os apontamentos abaixo."))
+            issues = review_result.get("problemas_identificados", [])
+            if issues:
+                st.dataframe(pd.DataFrame(issues), use_container_width=True, hide_index=True)
+            else:
+                st.success("A IA não identificou problemas explícitos de redação nesta leitura. Isso não garante correção jurídica.")
+            source_flags = review_result.get("pontos_que_exigem_fonte", [])
+            if source_flags:
+                st.warning("Pontos que precisam de conferência em fonte primária:")
+                for item in source_flags:
+                    st.write("- " + str(item))
+            proposed = review_result.get("versao_revisada", {})
+            with st.expander("Ver prévia da versão revisada"):
+                st.write("**Título:** " + str(proposed.get("titulo", "")))
+                for idx, slide in enumerate(proposed.get("slides", []), 1):
+                    st.markdown("**Slide " + str(idx) + ": " + str(slide.get("titulo", "")) + "**")
+                    st.write(slide.get("texto", ""))
+                if proposed.get("roteiro"):
+                    st.dataframe(pd.DataFrame(proposed["roteiro"]), use_container_width=True, hide_index=True)
+                st.markdown("**Legenda revisada**")
+                st.write(proposed.get("legenda", ""))
+                st.markdown("**Checklist da revisão**")
+                for item in proposed.get("checklist_revisao", []):
+                    st.write("- " + str(item))
+            if st.button("Aplicar versão revisada ao rascunho", type="primary", key="apply_language_legal_review"):
+                revised_draft = dict(proposed)
+                for metadata_key in ("_modelo_utilizado", "_provedor_utilizado", "aviso", "contexto_informado"):
+                    if metadata_key in d and metadata_key not in revised_draft:
+                        revised_draft[metadata_key] = d[metadata_key]
+                required_fields = ("titulo", "slides", "legenda", "fontes_para_conferir")
+                if not all(field in revised_draft for field in required_fields):
+                    st.error("A versão revisada veio incompleta. O rascunho original foi preservado.")
+                else:
+                    st.session_state["draft"] = revised_draft
+                    st.session_state.pop("language_legal_review", None)
+                    st.session_state.pop("language_legal_review_for_title", None)
+                    st.success("Versão revisada aplicada ao rascunho.")
+                    st.rerun()
+
         if st.button("Salvar rascunho"):
             with db() as c:c.execute("INSERT INTO pieces(created,subject,format,content,status,user_id) VALUES(?,?,?,?,?,?)",(datetime.now().isoformat(timespec="seconds"),d.get("titulo",subject),fmt,json.dumps(d,ensure_ascii=False),"Rascunho",user_id))
             st.success("Rascunho salvo.")
