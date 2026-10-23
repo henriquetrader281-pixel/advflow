@@ -860,6 +860,70 @@ Acabamento de revista/editorial profissional; iluminação deliberada; profundid
 RESTRIÇÕES
 Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos, caneta assinando contrato ou pessoas numa reunião de escritório como padrão automático; só usar esses elementos quando forem diretamente relevantes à pauta. Não usar peças de quebra-cabeça com termos jurídicos como metáfora genérica. Não sugerir sucesso, vitória, indenização garantida ou resultado de processo por meio da imagem. Prefira uma situação concreta, objeto ou cena que comunique a dúvida específica do público. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
 
+def build_gemini_final_art_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
+    """Prompt para o Gemini criar a peça completa, com a copy renderizada na própria imagem."""
+    bg, ink, accent = palette
+    style_words = {
+        "Fotografia editorial premium": "high-end editorial photography, photorealistic materials, refined natural window light, controlled cinematic shadows, deliberate 35mm-lens-like framing",
+        "Ilustração conceitual": "premium conceptual editorial illustration, original concrete visual metaphor, tactile paper grain, elegant geometry, restrained palette",
+        "Colagem contemporânea": "contemporary premium editorial collage, precise photographic cutouts, tactile paper layers, asymmetrical composition, controlled negative space",
+        "3D sofisticado": "high-end 3D still life, physically plausible materials, studio lighting, controlled reflections, sophisticated soft shadows",
+        "Documental cinematográfica": "cinematic documentary photography, believable real-world environment, natural directional light, authentic detail, restrained color grading",
+        "Infográfico ilustrado": "premium editorial infographic, precise visual hierarchy, legible typography, restrained graphic elements, clear information design"
+    }
+    composition = {
+        "Cena editorial": "one specific real-world scene directly related to the legal topic, with a clear visual focal point",
+        "Conceito visual": "one original and concrete visual metaphor that a non-lawyer can understand immediately",
+        "Infográfico sem texto": "a clean visual diagram with a small number of relevant elements, while still rendering the supplied headline and body text as the final overlay",
+        "Fluxo de etapas": "a clear step-by-step visual composition with simple directional cues and the exact supplied words",
+        "Comparação de conceitos": "a balanced two-part composition that makes the distinction understandable without adding unsupported claims",
+        "Linha do tempo visual": "a simple, orderly timeline-style composition; do not invent dates or events",
+        "Checklist visual": "a clean editorial checklist composition using only the supplied statements",
+        "Colagem editorial": "a refined editorial collage, while keeping text on a clean, high-contrast typographic layer"
+    }
+    density_words = {
+        "Enxuta": "one focal image, sparse supporting elements, generous negative space",
+        "Equilibrada": "one dominant focal point, no more than two supporting visual elements, comfortable text space",
+        "Rica em detalhes": "rich material texture and contextual detail, while preserving a calm hierarchy and ample legibility"
+    }
+    return f"""Create ONE COMPLETE, FINISHED Instagram artwork — NOT a background-only image and NOT a text-free image.
+Canvas: vertical {aspect_ratio}, preferably 1080 × 1350 pixels for a 4:5 Instagram carousel slide.
+The final image must already contain the supplied Portuguese headline and body text, accurately typeset and integrated into the design. The user should not need to add the copy in another editor.
+
+DESIGN DIRECTION
+Art direction: high-end corporate editorial, sophisticated, trustworthy, authoritative but calm, premium magazine quality, natural materials, cinematic yet controlled lighting, a coherent color system, elegant negative space, excellent typographic hierarchy.
+Selected style: {style_words.get(style, style)}.
+Composition type: {composition.get(visual_type, composition["Cena editorial"])}.
+Visual density: {density_words.get(density, density_words["Equilibrada"])}.
+Specific visual direction: {visual_direction or "Choose a concrete scene or object that directly explains the main idea in this slide, not generic legal stock imagery."}
+Color palette: {palette_name}; background {bg}, primary text/ink {ink}, accent {accent}. Use the accent color sparingly and keep text/background contrast high.
+Legal topic: {area}. Audience: {audience}. Tone: {tone}.
+
+EXACT PORTUGUESE TEXT TO RENDER IN THE IMAGE
+Headline — reproduce exactly, with correct Portuguese spelling and accents:
+“{title}”
+
+Body copy — reproduce every word, punctuation mark and accent exactly:
+“{body}”
+
+STRICT TEXT REQUIREMENTS
+- The headline and body above MUST be visible in the final artwork itself, not only described in your response.
+- Do not translate, paraphrase, shorten, rewrite, duplicate, omit or invent any of the supplied text.
+- Use Brazilian Portuguese exactly as provided. Check every accent, cedilla, punctuation mark and word before finishing.
+- Make all letters crisp, correctly spelled and readable on a phone. Headline must be clearly larger than body copy. Use line breaks and text blocks intelligently.
+- If the body is long, rearrange the composition and reduce font size moderately while keeping it readable; never crop or omit words to make it fit.
+- Do not insert labels such as “Gancho”, “Slide 1”, “Título”, “Texto”, or production notes as visible design text unless those exact words are part of the supplied copy.
+- Do not add any legal definitions, law references, dates, statistics, call to action, hashtags, fake signature or additional copy beyond the two text fields.
+
+COMPOSITION AND SAFETY
+- Keep all text well inside safe margins; no clipped letters, text touching the edges, or important visual content cut off.
+- Use a specific and appropriate visual metaphor or scene; do not default to puzzle pieces with legal terms, scales of justice, judge's gavel, books of law, handshake or pen signing a document unless directly relevant to this topic.
+- No office name, lawyer name, OAB number, placeholder footer, invented logo or watermark. Leave the footer clean; slide number only if explicitly present in the supplied copy.
+- Do not imply guaranteed legal outcomes, winning a case or guaranteed compensation.
+- Output only the finished image. Do not answer with a description, instructions or a blank background.
+"""
+
+
 def fetch_openrouter_image_models():
     """Fetch the live Image API catalog; returned model metadata controls optional parameters."""
     key=secret("OPENROUTER_API_KEY")
@@ -1232,6 +1296,7 @@ with tabs[2]:
     audience=draft.get("publico","público definido no briefing")
     tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
     prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density)
+    gemini_final_prompt=build_gemini_final_art_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density)
     generation_mode=st.radio("Forma de gerar a imagem",["Gemini Plus manual — usa sua assinatura","OpenRouter — geração direta pela API"],index=0,horizontal=True,key="studio_generation_mode")
     if generation_mode=="OpenRouter — geração direta pela API":
         st.warning("A geração direta usa saldo/créditos do OpenRouter e pode cobrar por imagem. Não é coberta pela assinatura Gemini Plus. Só será feita ao clicar em “Gerar imagem agora”.")
@@ -1292,26 +1357,27 @@ with tabs[2]:
             m3.caption("Custo informado pela API: "+(f"US$ {float(cost):.4f}" if isinstance(cost,(float,int)) else "não informado"))
             st.download_button("Baixar arte final PNG",st.session_state["openrouter_image_final"],st.session_state.get("openrouter_image_name","advflow_openrouter.png"),"image/png",key="download_openrouter_image_final")
     else:
-        st.markdown("#### Etapa 1 — criar a imagem no Gemini Plus")
-        st.caption("Abra o Gemini, cole o prompt abaixo, gere a imagem e salve o arquivo no computador. Peça a imagem sem texto: o AdvFlow aplica a tipografia depois e preserva melhor a acentuação.")
-        st.text_area("Prompt pronto para usar",value=prompt,height=300,key="gemini_plus_prompt")
-        st.download_button("Baixar prompt TXT",prompt.encode("utf-8"),"advflow_prompt_gemini.txt","text/plain",key="download_gemini_prompt")
-        st.markdown("[Abrir o aplicativo Gemini](https://gemini.google.com/)")
-        st.divider()
-        st.markdown("#### Etapa 2 — importar e finalizar")
-        uploaded=st.file_uploader("Envie a imagem gerada no Gemini Plus",type=["png","jpg","jpeg","webp","jfif"],key="gemini_plus_image_upload",help="Use imagens e referências que tenha direito de utilizar.")
-        if uploaded:
-            st.image(uploaded,use_container_width=True,caption="Imagem original gerada no Gemini")
-            if st.button("Aplicar identidade visual e copy",type="primary",key="compose_gemini_plus_image"):
-                try:
-                    final_img=compose_uploaded_art(uploaded.getvalue(),title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
-                    st.session_state["gemini_plus_composed"]=final_img.getvalue()
-                    st.session_state["gemini_plus_composed_name"]=f"advflow_slide_{slide_idx+1:02d}.png"
-                    st.success("Imagem importada e finalizada.")
-                except Exception as e:st.error("Não foi possível processar essa imagem: "+str(e))
-        if st.session_state.get("gemini_plus_composed"):
-            st.image(st.session_state["gemini_plus_composed"],use_container_width=True,caption="Arte final do AdvFlow")
-            st.download_button("Baixar arte final PNG",st.session_state["gemini_plus_composed"],st.session_state.get("gemini_plus_composed_name","advflow_slide.png"),"image/png",key="download_composed_gemini_image")
+        st.markdown("#### Gerar a arte final no Gemini Plus")
+        st.caption("Este prompt pede a imagem já pronta para publicar, com título e copy em português integrados à própria arte. Não é um prompt para gerar apenas o fundo.")
+        st.text_area("Prompt para a imagem completa — texto + arte",value=gemini_final_prompt,height=430,key="gemini_plus_prompt")
+        st.components.v1.html(
+            f"""<div style="font-family:sans-serif;padding:2px 0;">
+            <button id="copy-gemini-final-art-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt da arte completa</button>
+            <span id="copy-gemini-final-art-status" style="margin-left:10px;font-size:13px;"></span>
+            <script>
+            const finalArtPrompt = {json.dumps(gemini_final_prompt, ensure_ascii=False)};
+            const btn = document.getElementById('copy-gemini-final-art-prompt');
+            const status = document.getElementById('copy-gemini-final-art-status');
+            btn.addEventListener('click', async () => {{
+              try {{ await navigator.clipboard.writeText(finalArtPrompt); status.textContent = 'Copiado! Cole no Gemini.'; }}
+              catch (e) {{ status.textContent = 'Cópia automática indisponível; selecione o prompt acima e copie.'; }}
+            }});
+            </script></div>""",
+            height=52,
+        )
+        st.download_button("Baixar prompt completo (.txt)",gemini_final_prompt.encode("utf-8"),"advflow_prompt_gemini_arte_final.txt","text/plain",key="download_gemini_prompt")
+        st.link_button("Abrir Gemini", "https://gemini.google.com/", type="primary")
+        st.info("No Gemini, peça uma imagem final com todos os textos já inseridos. Confira acentuação e se nenhuma palavra foi omitida antes de publicar; modelos de imagem podem cometer erros de tipografia. Não é necessário importar a imagem de volta ao AdvFlow só para inserir o mesmo texto.")
     with st.expander("Alternativa sem IA"):
         st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada por IA.")
         if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
