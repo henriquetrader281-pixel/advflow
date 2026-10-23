@@ -667,6 +667,40 @@ REGRAS IMPORTANTES
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
 
+def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório"):
+    title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
+    body = str(slide.get("texto", "")).strip()
+    visual = str(slide.get("visual", "")).strip()
+    return f"""Gere SOMENTE UMA imagem final: SLIDE {slide_number} DE {total_slides} de um carrossel profissional para Instagram.
+
+FORMATO E COMPOSIÇÃO
+- Vertical 4:5, 1080 × 1350 pixels; uma arte individual, não uma página com várias miniaturas.
+- Não gerar o carrossel inteiro em uma imagem, nem grade, mosaico, storyboard ou colagem de slides.
+- Gere exatamente o slide {slide_number}; não substitua por outro slide.
+- Identidade visual consistente entre todos os slides: {palette_name}; acabamento editorial premium, margens seguras generosas, contraste alto e tipografia legível em celular.
+- Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rosto ou objetos.
+
+IDENTIDADE
+Escritório/marca: {office or "não informado"}
+OAB/identificação profissional: {oab or "não informado"}
+Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
+Público: {draft.get("publico", "público geral")}
+Título geral do carrossel: {draft.get("titulo", "Conteúdo jurídico")}
+
+COPY EXATA DESTA ARTE
+Título: {title}
+Texto: {body}
+Direção visual: {visual or "Criar uma metáfora visual editorial específica para o assunto."}
+
+REGRAS
+- Produza a arte final pronta para publicação, não apenas descrição ou fundo.
+- Preserve exatamente o sentido e o português da copy. Não invente leis, artigos, prazos, estatísticas, decisões ou fontes.
+- Não acrescente textos não solicitados. Se o texto for longo, reorganize a tipografia, sem cortar palavras ou omitir informações.
+- A arte deve pertencer visualmente ao mesmo conjunto, mas conter somente o conteúdo do slide {slide_number}.
+- Entregue a imagem final agora, sem explicar o processo.
+"""
+
+
 def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
     bg,ink,accent=palette
     styles={
@@ -926,9 +960,42 @@ with tabs[1]:
         if d.get("_modelo_utilizado"):
             st.caption("Modelo utilizado: "+str(d["_modelo_utilizado"]))
         st.write("**Título:**",d.get("titulo","")); st.write(d.get("resumo_estrategico",""))
+        current_draft_format = str(fmt if "fmt" in locals() else d.get("formato", "Carrossel")).lower()
         for i,s in enumerate(d.get("slides",[]),1):
             with st.expander(f"{i}. {s.get('titulo','Slide')}"):
                 st.write(s.get("texto","")); st.caption(s.get("visual",""))
+                if "carrossel" in current_draft_format:
+                    slide_prompt = build_gemini_carousel_slide_prompt(
+                        d, s, i, len(d.get("slides", [])),
+                        office=office, oab=oab,
+                        palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
+                    )
+                    st.components.v1.html(
+                        f"""<div style="font-family:sans-serif;padding:2px 0;">
+                        <button id="copy-carousel-slide" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt deste slide</button>
+                        <span id="copy-carousel-slide-status" style="margin-left:10px;font-size:13px;"></span>
+                        <script>
+                        const promptText = {json.dumps(slide_prompt, ensure_ascii=False)};
+                        const btn = document.getElementById('copy-carousel-slide');
+                        const status = document.getElementById('copy-carousel-slide-status');
+                        btn.addEventListener('click', async () => {{
+                          try {{
+                            await navigator.clipboard.writeText(promptText);
+                            status.textContent = 'Copiado! Cole no Gemini para gerar esta arte.';
+                          }} catch (e) {{
+                            status.textContent = 'Cópia automática indisponível; copie o texto do prompt na área abaixo.';
+                          }}
+                        }});
+                        </script></div>""",
+                        height=52,
+                    )
+                    with st.expander("Ver prompt completo deste slide"):
+                        st.text_area(
+                            f"Prompt do slide {i}",
+                            value=slide_prompt,
+                            height=260,
+                            key=f"gemini_carousel_slide_prompt_{i}"
+                        )
         if d.get("roteiro"):st.dataframe(pd.DataFrame(d["roteiro"]),use_container_width=True,hide_index=True)
         st.text_area("Legenda editável",d.get("legenda",""),key="draft_caption",height=130)
         st.write("**Hashtags:**"," ".join(d.get("hashtags",[])))
@@ -971,65 +1038,6 @@ with tabs[1]:
         st.download_button("Baixar briefing completo (.txt)", gemini_brief.encode("utf-8"), "advflow_briefing_gemini.txt", "text/plain", key="download_gemini_full_piece_brief")
         st.link_button("Abrir Gemini para criar a peça", "https://gemini.google.com/", type="primary")
         st.info("O briefing contém duas partes separadas: copy textual e direção criativa de imagem/vídeo. O link abre o Gemini, mas você precisa copiar e colar o briefing. Se a geração de vídeo não estiver disponível na sua conta/conversa, o prompt pede ao Gemini um plano de produção cena a cena em vez de afirmar que gerou o vídeo.")
-
-        # Carrossel: prompt de imagem individual por slide, pois o Gemini pode retornar só uma imagem por pedido.
-        current_gemini_format = str(fmt if "fmt" in locals() else d.get("formato", "Carrossel")).lower()
-        if d.get("slides") and "carrossel" in current_gemini_format:
-            st.divider()
-            st.markdown("#### Carrossel: gerar cada imagem separadamente")
-            st.caption("O Gemini costuma devolver uma imagem por solicitação. Se pedir o carrossel inteiro de uma vez, pode criar só a primeira arte. Selecione cada slide abaixo, copie o prompt individual, gere a imagem no Gemini e repita para o próximo.")
-            carousel_slides = d.get("slides", [])
-            carousel_labels = [f"{i+1:02d} — {str(slide.get('titulo', 'Slide'))[:65]}" for i, slide in enumerate(carousel_slides)]
-            carousel_choice = st.selectbox("Imagem que será gerada agora", carousel_labels, key="gemini_carousel_slide_choice")
-            carousel_idx = carousel_labels.index(carousel_choice)
-            carousel_slide = carousel_slides[carousel_idx]
-            carousel_title = str(carousel_slide.get("titulo", f"Slide {carousel_idx+1}")).strip()
-            carousel_body = str(carousel_slide.get("texto", "")).strip()
-            carousel_visual = str(carousel_slide.get("visual", "")).strip()
-            carousel_prompt = f"""Gere SOMENTE UMA imagem final: SLIDE {carousel_idx+1} DE {len(carousel_slides)} de um carrossel profissional para Instagram.
-
-FORMATO E COMPOSIÇÃO
-- Vertical 4:5, 1080 × 1350 pixels; uma única arte individual, não uma página com várias miniaturas.
-- Não gerar o carrossel inteiro em uma imagem, não fazer grade, mosaico, storyboard ou colagem de slides.
-- Esta solicitação é exclusivamente para o slide {carousel_idx+1}. Não pare para criar apenas a primeira arte: use exatamente o slide solicitado pelo usuário.
-- Manter padrão gráfico consistente entre os slides: {st.session_state.get("studio_palette", "Identidade do escritório")}; estilo editorial premium; margens seguras generosas; contraste alto; tipografia legível em celular.
-- Todos os elementos e textos dentro da área segura; não cortar palavras, letras, rosto ou objetos importantes.
-
-IDENTIDADE
-Escritório/marca: {office or "não informado"}
-OAB/identificação profissional: {oab or "não informado"}
-Área jurídica: {d.get("area_direito", "Geral / interdisciplinar")}
-Público: {d.get("publico", "público geral")}
-Título geral do carrossel: {d.get("titulo", "Conteúdo jurídico")}
-
-COPY EXATA DESTA ARTE
-Título: {carousel_title}
-Texto: {carousel_body}
-Direção visual específica: {carousel_visual or "Criar uma metáfora visual editorial específica para o assunto."}
-
-REGRAS
-- Renderize uma arte pronta para publicação, não apenas uma descrição ou um fundo.
-- Preserve o português e a copy acima exatamente; não invente leis, artigos, prazos, estatísticas, citações nem informações.
-- Não adicione textos que não foram solicitados. Se o texto for longo, organizar melhor a tipografia sem cortar ou reescrever.
-- A arte deve combinar visualmente com os demais slides, mas conter somente o conteúdo do slide {carousel_idx+1}.
-- Entregue a imagem final agora, sem explicar o processo."""
-            st.text_area("Prompt individual para o slide selecionado", value=carousel_prompt, height=300, key=f"gemini_carousel_individual_prompt_{carousel_idx}")
-            st.components.v1.html(
-                f"""<div style="font-family:sans-serif;padding:2px 0;">
-                <button id="copy-advflow-slide-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt deste slide</button>
-                <span id="copy-advflow-slide-status" style="margin-left:10px;font-size:13px;"></span>
-                <script>
-                const promptText = {json.dumps(carousel_prompt, ensure_ascii=False)};
-                const btn = document.getElementById('copy-advflow-slide-prompt');
-                const status = document.getElementById('copy-advflow-slide-status');
-                btn.addEventListener('click', async () => {{
-                  try {{ await navigator.clipboard.writeText(promptText); status.textContent = 'Copiado! Cole no Gemini.'; }}
-                  catch (e) {{ status.textContent = 'Cópia automática indisponível; selecione e copie o texto acima.'; }}
-                }});
-                </script></div>""",
-                height=52,
-            )
-            st.link_button("Abrir Gemini para gerar este slide", "https://gemini.google.com/")
 
 with tabs[2]:
     st.subheader("Estúdio visual | Gemini Plus, OpenRouter e AdvFlow")
