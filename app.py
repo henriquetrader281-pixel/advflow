@@ -847,13 +847,6 @@ Audience: {audience}
 Tone: {tone}
 
 DIREÇÃO DE ARTE
-Headline: {title}
-Ideia do slide: {str(body)[:700]}
-Área jurídica: {area}
-Público: {audience}
-Tom: {tone}
-
-DIREÇÃO DE ARTE
 Tipo de composição: {visual_type}. {type_directions.get(visual_type, type_directions["Cena editorial"])}
 Estilo: {styles.get(style,style)}.
 Densidade: {density}. {density_directions.get(density,density_directions["Equilibrada"])}
