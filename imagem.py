@@ -4,6 +4,7 @@ A primeira peça usa fotografia como capa; os slides seguintes usam layout edito
 tipográfico para manter legibilidade. OpenCV é opcional: sem ele, o foco fica no centro.
 """
 import os
+import re
 from functools import lru_cache
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 
