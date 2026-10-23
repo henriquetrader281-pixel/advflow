@@ -671,14 +671,20 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
     """Separa copy textual, direção visual de imagem e instruções de vídeo para o Gemini."""
     slides = draft.get("slides") or []
     text_copy, image_copy = [], []
+    generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide"}
     for i, slide in enumerate(slides, 1):
         title = str(slide.get("titulo", "")).strip()
         body = str(slide.get("texto", "")).strip()
         visual = str(slide.get("visual", "")).strip()
-        text_copy.append(f"SLIDE {i}\nTÍTULO/TEXTO: {title}\nCOPY TEXTUAL: {body}")
+        generic_title = title.casefold().strip(" :.-") in generic_titles or title.casefold().strip(" :.-") == f"slide {i}"
+        title_for_prompt = (
+            f"[RÓTULO INTERNO — NÃO EXIBIR: crie um título editorial curto e específico com base no texto do slide {i}]"
+            if generic_title else title
+        )
+        text_copy.append(f"SLIDE {i}\nTÍTULO EDITORIAL: {title_for_prompt}\nCOPY TEXTUAL: {body}")
         image_copy.append(
-            f"ARTE/IMAGEM {i}\nTEMA: {title}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
-            f"TEXTO QUE DEVE APARECER NA ARTE: {title}\nTEXTO DE APOIO: {body}"
+            f"ARTE/IMAGEM {i}\nTEMA: {title_for_prompt}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
+            f"TEXTO QUE DEVE APARECER NA ARTE: {title_for_prompt}\nTEXTO DE APOIO: {body}"
         )
     roteiro = draft.get("roteiro") or []
     video_lines = []
@@ -748,6 +754,7 @@ REGRAS IMPORTANTES
 - Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé da imagem; não use placeholders fictícios como “Nome do escritório” ou “OAB: UF 000000”. Se não houver solicitação expressa, deixe o rodapé limpo.
 - Não invente logotipo nem dados institucionais.
 - Não use “Gancho”, “Contexto”, “Slide 1” ou rótulos de roteiro como título final. Crie um título editorial concreto e natural para o público.
+- Não use quebra-cabeças com termos jurídicos soltos como metáfora genérica. Prefira uma cena ou objeto concreto que tenha ligação direta com a situação explicada.
 - Não exiba juridiquês como lista de palavras soltas. Explique cada termo técnico indispensável em linguagem comum, no próprio slide, sem alterar seu significado jurídico.
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
@@ -843,7 +850,7 @@ COMPOSIÇÃO E ACABAMENTO
 Acabamento de revista/editorial profissional; iluminação deliberada; profundidade e textura verossímeis; composição limpa e assimétrica, sem parecer uma imagem genérica de banco de imagens. Reserve espaço negativo limpo principalmente à esquerda e na parte inferior para que headline e copy sejam aplicadas depois. Posicione o assunto visual dominante à direita ou na região superior direita, sem cortar detalhes essenciais.
 
 RESTRIÇÕES
-Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos ou pessoas numa reunião de escritório, a menos que o assunto exija exatamente esse objeto ou contexto. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
+Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos ou pessoas numa reunião de escritório, a menos que o assunto exija exatamente esse objeto ou contexto. Não usar peças de quebra-cabeça com termos jurídicos como metáfora genérica. Prefira uma situação concreta, objeto ou cena que comunique a ideia específica do slide; evite símbolos abstratos sem ligação clara com a dúvida do público. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
 
 def fetch_openrouter_image_models():
     """Fetch the live Image API catalog; returned model metadata controls optional parameters."""
