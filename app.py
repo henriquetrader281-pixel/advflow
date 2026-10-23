@@ -1030,6 +1030,8 @@ with tabs[1]:
             st.session_state.pop("news_brief_subject",None)
             st.session_state.pop("news_brief_details",None)
             st.session_state.pop("news_brief_ready",None)
+            st.session_state.pop("language_legal_review",None)
+            st.session_state.pop("language_legal_review_for_title",None)
             st.session_state["draft"]=data; st.session_state["draft_provider"]=provider
     if "draft" in st.session_state:
         d=st.session_state["draft"]; st.caption("Motor utilizado: "+st.session_state.get("draft_provider",""))
