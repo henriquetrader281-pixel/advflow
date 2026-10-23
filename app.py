@@ -779,7 +779,8 @@ FORMATO E COMPOSIÇÃO
 - Vertical 4:5, 1080 × 1350 pixels; uma arte individual, não uma página com várias miniaturas.
 - Não gerar o carrossel inteiro em uma imagem, nem grade, mosaico, storyboard ou colagem de slides.
 - Gere exatamente o slide {slide_number}; não substitua por outro slide.
-- Identidade visual consistente entre todos os slides: {palette_name}; acabamento editorial premium, composição elegante, hierarquia clara, margens seguras generosas, contraste alto e tipografia legível em celular.
+- Sistema visual consistente em todos os slides: {palette_name}; padrão editorial premium, iluminação sofisticada, materiais realistas e paleta consistente, mas com cena/metáfora visual específica para cada argumento.
+- Acabamento de revista profissional: high-end corporate editorial, sophisticated, trustworthy, calm authority, cinematic yet natural lighting, precise composition and ample safe margins.
 - Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
 - Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo; somente a numeração do slide pode aparecer, se necessária.
 
@@ -810,12 +811,12 @@ REGRAS DE PORTUGUÊS E PRECISÃO JURÍDICA
 def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
     bg,ink,accent=palette
     styles={
-      "Fotografia editorial premium":"fotografia editorial realista, direção de arte de revista premium, luz controlada e natural, materiais e texturas verossímeis, enquadramento intencional",
-      "Ilustração conceitual":"ilustração editorial autoral, metáfora visual específica, camadas e textura tátil, acabamento sofisticado de publicação de design",
-      "Colagem contemporânea":"colagem editorial contemporânea, mistura refinada de fotografia e recortes geométricos, composição assimétrica, textura de papel e profundidade",
-      "3D sofisticado":"natureza-morta 3D de alto padrão, objetos com materiais plausíveis, iluminação de estúdio e sombras delicadas",
-      "Documental cinematográfica":"fotografia documental cinematográfica, ambiente realista, iluminação natural, detalhes observacionais e composição precisa",
-      "Infográfico ilustrado":"infográfico editorial com poucos elementos, diagrama visual claro e ilustrações específicas, sem aparência de template pronto"
+      "Fotografia editorial premium":"high-end editorial photography, premium magazine art direction, photorealistic materials, refined natural window light, soft cinematic shadows, 35mm lens look, deliberate framing, subtle film texture; fotografia editorial sofisticada e verossímil",
+      "Ilustração conceitual":"premium conceptual editorial illustration, art-directed visual metaphor, refined paper grain, elegant geometry, layered depth, restrained palette, contemporary museum-catalog finish; ilustração autoral ligada à ideia específica",
+      "Colagem contemporânea":"contemporary premium editorial collage, precise photographic cutouts, tactile paper layers, asymmetrical composition, controlled negative space, refined depth and texture; sem aparência de template genérico",
+      "3D sofisticado":"high-end 3D still life, physically plausible materials, studio lighting, controlled reflections, sophisticated soft shadows, premium product-render finish; objetos contextualizados ao tema",
+      "Documental cinematográfica":"cinematic documentary photography, believable real-world environment, natural directional light, authentic detail, restrained color grading, shallow depth of field when appropriate; sem dramatização exagerada",
+      "Infográfico ilustrado":"premium editorial infographic, clean visual hierarchy, precise diagram, a small number of purposeful elements, refined line work and restrained colors; informação visual clara e sem decoração supérflua"
     }
     type_directions={
       "Cena editorial":"Uma única cena editorial forte: objeto, pessoa sem identidade reconhecível, ambiente e ação que expressem o ponto específico. Não tentar resumir a área inteira em símbolos genéricos.",
@@ -832,9 +833,20 @@ def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_n
       "Equilibrada":"Um foco dominante e no máximo dois elementos de apoio claramente subordinados.",
       "Rica em detalhes":"Mais textura, cenário e elementos contextuais, mantendo um foco dominante e sem poluição visual."
     }
-    return f"""Crie uma imagem de fundo original e profissional para uma peça de comunicação jurídica brasileira. Proporção desejada {aspect_ratio}, formato vertical para Instagram e finalização posterior no AdvFlow.
+    return f"""Create an original, premium editorial background for Brazilian legal communication. Aspect ratio {aspect_ratio}, vertical Instagram format, to be finished later in AdvFlow. Prefer precise visual storytelling over generic legal stock imagery.
 
-CONTEÚDO EXATO
+ART DIRECTION
+Use these visual keywords as style guidance: high-end corporate editorial, sophisticated, trustworthy, authoritative but calm, photorealistic or carefully art-directed according to the selected style, cinematic lighting, natural materials, strong visual hierarchy, elegant negative space, subtle gold accents only when compatible with the selected palette. Build the scene around the specific argument of this slide, not around a generic idea of “law”.
+Style selected: {style}. {styles.get(style,style)}
+
+CONTENT CONTEXT — DO NOT RENDER THIS AS TEXT
+Headline: {title}
+Slide idea: {str(body)[:700]}
+Legal area: {area}
+Audience: {audience}
+Tone: {tone}
+
+DIREÇÃO DE ARTE
 Headline: {title}
 Ideia do slide: {str(body)[:700]}
 Área jurídica: {area}
@@ -853,7 +865,7 @@ COMPOSIÇÃO E ACABAMENTO
 Acabamento de revista/editorial profissional; iluminação deliberada; profundidade e textura verossímeis; composição limpa e assimétrica, sem parecer uma imagem genérica de banco de imagens. Reserve espaço negativo limpo principalmente à esquerda e na parte inferior para que headline e copy sejam aplicadas depois. Posicione o assunto visual dominante à direita ou na região superior direita, sem cortar detalhes essenciais.
 
 RESTRIÇÕES
-Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos ou pessoas numa reunião de escritório, a menos que o assunto exija exatamente esse objeto ou contexto. Não usar peças de quebra-cabeça com termos jurídicos como metáfora genérica. Prefira uma situação concreta, objeto ou cena que comunique a ideia específica do slide; evite símbolos abstratos sem ligação clara com a dúvida do público. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
+Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos, caneta assinando contrato ou pessoas numa reunião de escritório como padrão automático; só usar esses elementos quando forem diretamente relevantes à pauta. Não usar peças de quebra-cabeça com termos jurídicos como metáfora genérica. Não sugerir sucesso, vitória, indenização garantida ou resultado de processo por meio da imagem. Prefira uma situação concreta, objeto ou cena que comunique a dúvida específica do público. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
 
 def fetch_openrouter_image_models():
     """Fetch the live Image API catalog; returned model metadata controls optional parameters."""
