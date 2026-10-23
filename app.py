@@ -150,7 +150,9 @@ SYSTEM = """Você é diretor de criação e estrategista sênior de conteúdo pa
 REVISÃO OBRIGATÓRIA ANTES DE ENTREGAR:
 - Revise todo o conteúdo em português brasileiro: ortografia, acentuação, concordância, regência, pontuação, sintaxe, coesão e naturalidade.
 - Revise a terminologia jurídica: use o termo técnico correto para o instituto descrito; não trate conceitos diferentes como sinônimos nem substitua termos jurídicos por palavras vagas.
-- Evite juridiquês desnecessário. Quando um termo técnico for indispensável, use-o corretamente e explique-o em linguagem simples na primeira ocorrência, sem perder precisão.
+- Escreva para leigos inteligentes: prefira palavras comuns, frases diretas e exemplos cotidianos, sem perder rigor jurídico.
+- Não use rótulos internos de roteiro como título visível. Nunca deixe títulos como “Gancho”, “Introdução”, “Contexto”, “Explicação”, “Conclusão” ou “Slide 1” como manchete final; transforme-os em títulos editoriais específicos para o tema e para o texto daquele slide.
+- Não coloque termos técnicos isolados sem explicação, como “ato ilícito”, “nexo causal” ou “dano”. Quando necessários, explique brevemente em português simples na própria peça (por exemplo, “conduta contrária ao direito”, “ligação entre a conduta e o prejuízo” e “prejuízo sofrido”), sem tratar essas expressões como definição universal quando o contexto exigir nuance.
 - Distinga fato, regra geral, exceção, interpretação e hipótese. Não transforme uma possibilidade em certeza nem apresente orientação geral como conclusão aplicável a todo caso.
 - Não invente leis, artigos, prazos, súmulas, precedentes, requisitos ou fontes. Quando a precisão jurídica depender de confirmação em fonte primária atualizada, sinalize isso claramente em fontes_para_conferir e checklist_revisao.
 - Não reescreva de forma que mude o sentido jurídico. Se houver ambiguidade ou informação insuficiente, sinalize o trecho em vez de adivinhar.
@@ -650,8 +652,7 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
         wrapped(body,86,y+45,font(32),855,ink_rgb,45,13)
     d.line((72,1204,1008,1204),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
-    d.text((72,1225),(signature or "CONTEÚDO INFORMATIVO")[:45],font=font(20,True),fill=ink_rgb)
-    d.text((72,1266),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
+    d.text((72,1242),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
     d.text((935,1302),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
     if logo_bytes:
         try:
@@ -702,11 +703,10 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
 ENTREGA DESEJADA
 {media_instructions}
 
-IDENTIDADE E DIREÇÃO
-Escritório/marca: {office or "não informado"}
-Identificação profissional/OAB: {oab or "não informado"}
+IDENTIDADE E DIREÇÃO VISUAL
 Paleta: {palette_name}
 Estilo visual: {visual_style}
+Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo; use apenas a numeração do slide quando necessária.
 Público-alvo: {audience}
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
 Tom de voz: {draft.get("tom_de_voz", "sóbrio, didático e profissional")}
@@ -739,41 +739,54 @@ REGRAS IMPORTANTES
 - Respeite a publicidade informativa e discreta da advocacia e as regras aplicáveis da OAB. Sem promessa de resultado, pressão comercial ou captação indevida.
 - Revise o português brasileiro antes de produzir as peças: acentuação, ortografia, concordância, regência, pontuação e naturalidade. Preserve a terminologia jurídica correta, evite juridiquês desnecessário e explique termos técnicos quando isso couber na copy.
 - Use português brasileiro correto, acentuação correta e texto legível em tela de celular.
-- Não invente logotipo, dados de escritório ou identificação OAB.
+- Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé da imagem; não use placeholders fictícios como “Nome do escritório” ou “OAB: UF 000000”. Se não houver solicitação expressa, deixe o rodapé limpo.
+- Não invente logotipo nem dados institucionais.
+- Não use “Gancho”, “Contexto”, “Slide 1” ou rótulos de roteiro como título final. Crie um título editorial concreto e natural para o público.
+- Não exiba juridiquês como lista de palavras soltas. Explique cada termo técnico indispensável em linguagem comum, no próprio slide, sem alterar seu significado jurídico.
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
 
 def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório"):
-    title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
+    raw_title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
     body = str(slide.get("texto", "")).strip()
     visual = str(slide.get("visual", "")).strip()
+    generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {slide_number}"}
+    title_is_generic = raw_title.casefold().strip(" :.-") in generic_titles
+    title_instruction = (
+        f"O rótulo interno “{raw_title}” NÃO pode aparecer na arte. Crie um título editorial curto, específico e natural a partir do texto abaixo."
+        if title_is_generic else
+        f"Use este título, após corrigir apenas eventual erro claro de português: {raw_title}"
+    )
     return f"""Gere SOMENTE UMA imagem final: SLIDE {slide_number} DE {total_slides} de um carrossel profissional para Instagram.
 
 FORMATO E COMPOSIÇÃO
 - Vertical 4:5, 1080 × 1350 pixels; uma arte individual, não uma página com várias miniaturas.
 - Não gerar o carrossel inteiro em uma imagem, nem grade, mosaico, storyboard ou colagem de slides.
 - Gere exatamente o slide {slide_number}; não substitua por outro slide.
-- Identidade visual consistente entre todos os slides: {palette_name}; acabamento editorial premium, margens seguras generosas, contraste alto e tipografia legível em celular.
-- Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rosto ou objetos.
+- Identidade visual consistente entre todos os slides: {palette_name}; acabamento editorial premium, composição elegante, hierarquia clara, margens seguras generosas, contraste alto e tipografia legível em celular.
+- Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
+- Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo; somente a numeração do slide pode aparecer, se necessária.
 
-IDENTIDADE
-Escritório/marca: {office or "não informado"}
-OAB/identificação profissional: {oab or "não informado"}
+CONTEXTO EDITORIAL
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
 Público: {draft.get("publico", "público geral")}
 Título geral do carrossel: {draft.get("titulo", "Conteúdo jurídico")}
 
-COPY EXATA DESTA ARTE
-Título: {title}
-Texto: {body}
-Direção visual: {visual or "Criar uma metáfora visual editorial específica para o assunto."}
+TÍTULO DA ARTE
+{title_instruction}
 
-REGRAS
-- Produza a arte final pronta para publicação, não apenas descrição ou fundo.
-- Revise ortografia, acentuação, concordância, regência e pontuação antes de renderizar a arte. Preserve a terminologia jurídica correta e não troque termos técnicos por sinônimos imprecisos.
-- Preserve exatamente o sentido e o português da copy. Não invente leis, artigos, prazos, estatísticas, decisões ou fontes.
-- Não acrescente textos não solicitados. Se o texto for longo, reorganize a tipografia, sem cortar palavras ou omitir informações.
-- A arte deve pertencer visualmente ao mesmo conjunto, mas conter somente o conteúdo do slide {slide_number}.
+TEXTO DA ARTE
+{body}
+
+DIREÇÃO VISUAL
+{visual or "Criar uma metáfora visual editorial específica para a ideia deste slide."}
+
+REGRAS DE PORTUGUÊS E PRECISÃO JURÍDICA
+- Use português brasileiro natural e correto: revise acentuação, ortografia, concordância, regência e pontuação.
+- Não deixe a palavra “Gancho” nem títulos estruturais como título público. Crie uma manchete editorial coerente com o assunto.
+- Prefira palavras comuns. Não mostre termos jurídicos isolados sem explicação. Se usar “ato ilícito”, “nexo causal” ou “dano”, explique cada termo brevemente em linguagem simples no próprio slide, sem simplificar de forma juridicamente incorreta.
+- Não invente leis, artigos, prazos, estatísticas, decisões ou fontes. Não altere a copy de modo a mudar o sentido jurídico.
+- Gere uma arte pronta para publicação, não apenas uma descrição ou um fundo. Não acrescente assinatura, OAB ou dados de escritório no rodapé.
 - Entregue a imagem final agora, sem explicar o processo.
 """
 
