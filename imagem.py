@@ -88,11 +88,14 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
     bgc, ink, accent = tuple(palette)
     image = Image.new("RGB", (W, height), bgc)
     draw = ImageDraw.Draw(image)
-    title = str(slide.get("titulo") or "")
-    body = str(slide.get("texto") or slide.get("copy") or slide.get("corpo") or "")
+    title = str(slide.get("titulo") or "").strip()
+    body = str(slide.get("texto") or slide.get("copy") or slide.get("corpo") or "").strip()
+    generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {index+1}"}
+    if title.casefold().strip(" :.-") in generic_titles:
+        first_sentence = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)[0].strip()
+        title = first_sentence if first_sentence and len(first_sentence) <= 95 else "O que isso significa na prática?"
     kicker = str(slide.get("kicker") or "CONTEÚDO INFORMATIVO").upper()[:72]
     muted = tuple(int(a * .72 + b * .28) for a,b in zip(ImageColor.getrgb(ink), ImageColor.getrgb(bgc)))
-    footer = str(office or "CONTEÚDO INFORMATIVO") + (f" · OAB {oab}" if oab else "")
     disclaimer = "Informação geral. Avalie o contexto e as fontes aplicáveis."
 
     if bg is not None:
@@ -113,7 +116,6 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         for line in body_lines:
             draw.text((x0,y),line,font=body_font,fill=muted); y += body_step
         draw.rectangle((x0,bottom-120,x1,bottom-118),fill=accent)
-        draw.text((x0,bottom-98),footer[:72],font=font(24,True),fill=ink)
         if total > 1:
             draw.text((x1-100,bottom-98),f"{index+1:02d}/{total:02d}",font=font(24,True),fill=accent)
         draw.text((x0,bottom-55),disclaimer,font=font(18),fill=muted)
@@ -133,8 +135,6 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         body_font,body_lines,body_step=fit(draw,body,x1-x0,max(80,height-300-y),[42,38,34,30,27],False,1.4,12)
         for line in body_lines:
             draw.text((x0,y),line,font=body_font,fill=muted); y += body_step
-        draw.rectangle((x0,height-150,x1,height-148),fill=accent)
-        draw.text((x0,height-126),footer[:72],font=font(26,True),fill=ink)
         draw.text((x0,height-78),disclaimer,font=font(19),fill=muted)
     if logo is not None:
         try:
