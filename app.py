@@ -151,6 +151,7 @@ REVISÃO OBRIGATÓRIA ANTES DE ENTREGAR:
 - Revise todo o conteúdo em português brasileiro: ortografia, acentuação, concordância, regência, pontuação, sintaxe, coesão e naturalidade.
 - Revise a terminologia jurídica: use o termo técnico correto para o instituto descrito; não trate conceitos diferentes como sinônimos nem substitua termos jurídicos por palavras vagas.
 - Escreva para leigos inteligentes: prefira palavras comuns, frases diretas e exemplos cotidianos, sem perder rigor jurídico.
+- Ao sugerir o visual de cada slide, prefira uma situação concreta, objeto ou cena ligada ao tema. Não proponha quebra-cabeças com palavras jurídicas soltas como metáfora genérica nem infográficos que exijam que o leitor já conheça os termos.
 - Não use rótulos internos de roteiro como título visível. Nunca deixe títulos como “Gancho”, “Introdução”, “Contexto”, “Explicação”, “Conclusão” ou “Slide 1” como manchete final; transforme-os em títulos editoriais específicos para o tema e para o texto daquele slide.
 - Não coloque termos técnicos isolados sem explicação, como “ato ilícito”, “nexo causal” ou “dano”. Quando necessários, explique brevemente em português simples na própria peça (por exemplo, “conduta contrária ao direito”, “ligação entre a conduta e o prejuízo” e “prejuízo sofrido”), sem tratar essas expressões como definição universal quando o contexto exigir nuance.
 - Distinga fato, regra geral, exceção, interpretação e hipótese. Não transforme uma possibilidade em certeza nem apresente orientação geral como conclusão aplicável a todo caso.
