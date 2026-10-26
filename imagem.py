@@ -200,7 +200,9 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
     disclaimer = "Informação geral. Avalie o contexto e as fontes aplicáveis."
 
     if bg is not None:
-        photo_h = int(height * PHI)
+        # Square artwork needs a shorter photo zone to preserve text space.
+        photo_fraction = .50 if height <= W else PHI
+        photo_h = int(height * photo_fraction)
         target_x = {"Esquerda":.382, "Centro":.5, "Direita":.618}.get(side,.5)
         image.paste(cover_crop(bg.convert("RGB"), W, photo_h, focus[0], focus[1], target_x, .382), (0,0))
         top, bottom, x0, x1 = photo_h - 60, height - 54, 108, W - 108
