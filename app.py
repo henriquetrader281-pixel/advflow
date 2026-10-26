@@ -467,51 +467,112 @@ def model_candidates(configured, defaults):
             candidates.append(item)
     return candidates
 
+def configured_api_key(name):
+    """Treat blank/example secrets as missing so the app never sends placeholder keys."""
+    value=str(secret(name,"") or "").strip()
+    upper=value.upper()
+    placeholders=("COLE_SUA_CHAVE","SUA_CHAVE","SUBSTITUA_POR","SEU_PROJECT_REF","YOUR_API_KEY","PLACEHOLDER")
+    if not value or any(marker in upper for marker in placeholders):
+        return ""
+    return value
+
+
 def call_gemini(prompt, system_prompt=SYSTEM):
-    key=secret("GEMINI_API_KEY")
-    if not key: raise RuntimeError("GEMINI_API_KEY não configurada nos Secrets do Streamlit")
+    key=configured_api_key("GEMINI_API_KEY")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY não configurada nos Secrets do Streamlit")
     configured=secret("GEMINI_MODEL","gemini-3.8-flash")
-    candidates=model_candidates(configured,["gemini-3.8-flash","gemini-3.7-flash","gemini-3.6-flash","gemini-3.5-flash-lite"])
+    candidates=model_candidates(configured,[
+        "gemini-3.8-flash","gemini-3.6-flash","gemini-3.5-flash-lite",
+        "gemini-2.5-flash-lite","gemini-2.5-flash"
+    ])
     failures=[]
     for model in candidates:
         try:
-            r=requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",params={"key":key},
-              json={"systemInstruction":{"parts":[{"text":system_prompt}]},"contents":[{"role":"user","parts":[{"text":prompt}]}],"generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}},timeout=60)
-            if not r.ok:
-                detail=error_detail(r)
-                failures.append(f"{model}: HTTP {r.status_code} ({detail})")
-                if r.status_code in (400,404,422):
+            response=requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key":key},
+                json={
+                    "systemInstruction":{"parts":[{"text":system_prompt}]},
+                    "contents":[{"role":"user","parts":[{"text":prompt}]}],
+                    "generationConfig":{"temperature":0.55,"responseMimeType":"application/json"}
+                },
+                timeout=60
+            )
+            if not response.ok:
+                detail=error_detail(response)
+                failures.append(f"{model}: HTTP {response.status_code} ({detail})")
+                if response.status_code in (400,404,422,429,500,502,503,504):
                     continue
-                raise RuntimeError(f"Gemini HTTP {r.status_code}: {detail}")
-            payload=json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
+                raise RuntimeError(f"Gemini HTTP {response.status_code}: {detail}")
+            try:
+                payload=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+            except (KeyError,IndexError,TypeError,ValueError) as exc:
+                failures.append(f"{model}: resposta JSON inválida ({exc.__class__.__name__})")
+                continue
+            if not isinstance(payload,dict):
+                failures.append(f"{model}: a resposta não é um objeto JSON")
+                continue
             payload["_modelo_utilizado"]=model
             return payload
         except requests.RequestException as exc:
             failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
-    raise RuntimeError("Nenhum modelo Gemini funcionou. " + " | ".join(failures[:4]))
+    raise RuntimeError("Nenhum modelo Gemini funcionou. "+" | ".join(failures[:5]))
 
 def call_groq(prompt, system_prompt=SYSTEM):
-    key=secret("GROQ_API_KEY")
-    if not key: raise RuntimeError("GROQ_API_KEY não configurada nos Secrets do Streamlit")
-    configured=secret("GROQ_MODEL","openai/gpt-oss-120b")
-    candidates=model_candidates(configured,["openai/gpt-oss-120b","openai/gpt-oss-20b"])
+    key=configured_api_key("GROQ_API_KEY")
+    if not key:
+        raise RuntimeError("GROQ_API_KEY não configurada nos Secrets do Streamlit")
+    configured=str(secret("GROQ_MODEL","openai/gpt-oss-120b") or "openai/gpt-oss-120b").strip()
+    # The configured model is attempted first, followed by active IDs documented by Groq.
+    candidates=model_candidates(configured,[
+        "openai/gpt-oss-120b","openai/gpt-oss-20b","qwen/qwen3.8-27b"
+    ])
     failures=[]
+    user_content=prompt+"\n\nRetorne apenas um objeto JSON válido, sem markdown ou comentários."
     for model in candidates:
-        try:
-            r=requests.post("https://api.groq.com/openai/v1/chat/completions",headers={"Authorization":"Bearer "+key},
-              json={"model":model,"temperature":0.55,"response_format":{"type":"json_object"},"messages":[{"role":"system","content":system_prompt},{"role":"user","content":prompt}]},timeout=60)
-            if not r.ok:
-                detail=error_detail(r)
-                failures.append(f"{model}: HTTP {r.status_code} ({detail})")
-                if r.status_code in (400,404,422):
+        for json_mode in (True,False):
+            body={
+                "model":model,
+                "messages":[
+                    {"role":"system","content":system_prompt},
+                    {"role":"user","content":user_content}
+                ]
+            }
+            if json_mode:
+                body["response_format"]={"type":"json_object"}
+            try:
+                response=requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization":"Bearer "+key,"Content-Type":"application/json"},
+                    json=body,
+                    timeout=60
+                )
+            except requests.RequestException as exc:
+                failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
+                break
+            if not response.ok:
+                detail=error_detail(response)
+                failures.append(f"{model} ({'modo JSON' if json_mode else 'modo texto'}): HTTP {response.status_code} ({detail})")
+                if json_mode and response.status_code==400:
                     continue
-                raise RuntimeError(f"Groq HTTP {r.status_code}: {detail}")
-            payload=json.loads(r.json()["choices"][0]["message"]["content"])
+                if response.status_code in (400,403,404,422,429,500,502,503,504):
+                    break
+                raise RuntimeError(f"Groq HTTP {response.status_code}: {detail}")
+            try:
+                raw_content=response.json()["choices"][0]["message"]["content"]
+                payload=parse_json_response(raw_content)
+                if not isinstance(payload,dict):
+                    raise ValueError("A resposta não é um objeto JSON.")
+            except Exception as exc:
+                failures.append(f"{model} ({'modo JSON' if json_mode else 'modo texto'}): resposta inválida ({str(exc)[:160]})")
+                if json_mode:
+                    continue
+                break
             payload["_modelo_utilizado"]=model
             return payload
-        except requests.RequestException as exc:
-            failures.append(f"{model}: falha de conexão ({exc.__class__.__name__})")
-    raise RuntimeError("Nenhum modelo Groq funcionou. " + " | ".join(failures[:3]))
+    raise RuntimeError("Nenhum modelo Groq funcionou. "+" | ".join(failures[:5]))
+
 def parse_json_response(content):
     """Parse JSON returned by chat-completion providers, tolerating fenced output."""
     text_value=(content or "").strip()
@@ -525,7 +586,7 @@ def parse_json_response(content):
         raise RuntimeError("O modelo não retornou um objeto JSON válido. Tente outro modelo no OpenRouter.")
 
 def call_openrouter(prompt, system_prompt=SYSTEM):
-    key=secret("OPENROUTER_API_KEY")
+    key=configured_api_key("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit")
     configured=secret("OPENROUTER_MODEL","openrouter/free")
@@ -581,7 +642,7 @@ def call_openrouter(prompt, system_prompt=SYSTEM):
     raise RuntimeError("Nenhum modelo OpenRouter funcionou. "+" | ".join(failures[:3]))
 
 def test_openrouter_connection():
-    key=secret("OPENROUTER_API_KEY")
+    key=configured_api_key("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit")
     model=secret("OPENROUTER_MODEL","openrouter/free").strip() or "openrouter/free"
@@ -629,37 +690,42 @@ def generate(subject, fmt, audience, goal, details="", area="Geral / interdiscip
     return result,"Modelo local"
 
 def review_language_and_legal_precision(draft, preferred_provider=""):
-    """Executa uma segunda revisão por IA, sem substituir o rascunho automaticamente."""
-    review_input = json.dumps({
-        "conteudo_gerado": {k: v for k, v in draft.items() if not str(k).startswith("_")},
-        "instrucoes": [
+    """Revisa português/terminologia e tenta integrações configuradas sem travar no primeiro erro."""
+    review_input=json.dumps({
+        "conteudo_gerado":{k:v for k,v in draft.items() if not str(k).startswith("_")},
+        "instrucoes":[
             "Revisar todo o português brasileiro e a terminologia jurídica.",
             "Preservar sentido e fatos; não inventar fundamentos legais.",
             "Separar correções linguísticas de questões que exigem consulta a fonte primária.",
             "Entregar JSON no esquema definido pelo revisor."
         ]
-    }, ensure_ascii=False)
-    prompt = "Faça uma segunda revisão editorial e de precisão terminológica jurídica deste conteúdo. Produza o JSON de revisão solicitado.\n\n" + review_input
-    providers = {
-        "Gemini": call_gemini,
-        "Groq (alternativo)": call_groq,
-        "OpenRouter (alternativo)": call_openrouter
-    }
-    order = []
-    if preferred_provider in providers:
-        order.append((preferred_provider, providers[preferred_provider]))
-    order.extend((name, fn) for name, fn in providers.items() if name not in [n for n, _ in order])
-    errors = []
-    for name, fn in order:
+    },ensure_ascii=False)
+    prompt="Faça uma segunda revisão editorial e de precisão terminológica jurídica deste conteúdo. Produza o JSON de revisão solicitado.\n\n"+review_input
+    providers=[
+        ("Gemini","GEMINI_API_KEY",call_gemini),
+        ("Groq (alternativo)","GROQ_API_KEY",call_groq),
+        ("OpenRouter (alternativo)","OPENROUTER_API_KEY",call_openrouter)
+    ]
+    configured=[(name,fn) for name,key_name,fn in providers if configured_api_key(key_name)]
+    if not configured:
+        raise RuntimeError("Nenhuma chave de IA válida está configurada. Confira GEMINI_API_KEY, GROQ_API_KEY ou OPENROUTER_API_KEY nos Secrets do Streamlit.")
+    aliases={"Groq":"Groq (alternativo)","OpenRouter":"OpenRouter (alternativo)"}
+    preferred=aliases.get(preferred_provider,preferred_provider)
+    ordered=[]
+    if preferred in {name for name,_ in configured}:
+        ordered.extend((name,fn) for name,fn in configured if name==preferred)
+    ordered.extend((name,fn) for name,fn in configured if name!=preferred)
+    errors=[]
+    for name,fn in ordered:
         try:
-            result = fn(prompt, system_prompt=LINGUISTIC_REVIEW_SYSTEM)
-            if not isinstance(result, dict) or not isinstance(result.get("versao_revisada"), dict):
+            result=fn(prompt,system_prompt=LINGUISTIC_REVIEW_SYSTEM)
+            if not isinstance(result,dict) or not isinstance(result.get("versao_revisada"),dict):
                 raise ValueError("A IA não retornou a versão revisada no formato esperado.")
-            result["_provedor_revisao"] = name
+            result["_provedor_revisao"]=name
             return result
         except Exception as exc:
-            errors.append(name + ": " + str(exc))
-    raise RuntimeError("Não foi possível executar a revisão com as IAs configuradas. " + " | ".join(errors[:3]))
+            errors.append(name+": "+str(exc))
+    raise RuntimeError("Não foi possível executar a revisão. Provedores configurados tentados: "+" | ".join(errors[:3]))
 
 
 
@@ -717,7 +783,7 @@ def generate_professional_copy(subject, audience, fmt, area, objective, tone, de
     ]
     errors = []
     for name, key_name, fn in providers:
-        if not secret(key_name).strip():
+        if not configured_api_key(key_name):
             errors.append(name + ": integração não configurada")
             continue
         try:
@@ -1215,7 +1281,7 @@ COMPOSITION AND SAFETY
 
 def fetch_openrouter_image_models():
     """Fetch the live Image API catalog; returned model metadata controls optional parameters."""
-    key=secret("OPENROUTER_API_KEY")
+    key=configured_api_key("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("Configure OPENROUTER_API_KEY em Streamlit Secrets para carregar o catálogo de imagens.")
     response=requests.get(
@@ -1270,7 +1336,7 @@ def _choose_enum_parameter(spec, preferred):
 
 def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image=None, reference_mime="image/png", aspect_ratio="4:5"):
     """Generate one image via OpenRouter's unified Image API; this endpoint can consume credits."""
-    key=secret("OPENROUTER_API_KEY")
+    key=configured_api_key("OPENROUTER_API_KEY")
     if not key:
         raise RuntimeError("OPENROUTER_API_KEY não configurada nos Secrets do Streamlit.")
     model_id=(model_id or "").strip()
@@ -1745,7 +1811,7 @@ with tabs[1]:
         image_reference=st.file_uploader("Imagem de referência opcional (estilo/continuidade)",type=["png","jpg","jpeg","webp","jfif"],key="openrouter_image_reference",help="Só será enviada se o modelo anunciar suporte a input_references. Evite usar imagens com dados pessoais ou documentos reais.")
         confirm_cost=st.checkbox("Confirmo que quero consumir créditos do OpenRouter para gerar esta imagem.",key="confirm_openrouter_image_cost")
         if st.button("Gerar imagem agora",type="primary",key="generate_openrouter_image"):
-            if not secret("OPENROUTER_API_KEY"):
+            if not configured_api_key("OPENROUTER_API_KEY"):
                 st.error("Configure OPENROUTER_API_KEY em Streamlit → Settings → Secrets.")
             elif not confirm_cost:
                 st.warning("Marque a confirmação de custos antes de executar a geração.")
