@@ -311,7 +311,7 @@ REVISÃO OBRIGATÓRIA ANTES DE ENTREGAR:
 Retorne JSON válido com as chaves:
 titulo, promessa_editorial, angulo_editorial, publico, area_direito, etapa_funil, resumo_estrategico, gancho, slides (lista de objetos titulo/texto/visual/objetivo_do_slide), roteiro (lista de cena/fala/visual), legenda, cta_educativa, hashtags, fontes_para_conferir, checklist_revisao.
 No checklist_revisao, inclua itens sobre português brasileiro, precisão e consistência terminológica jurídica, clareza para o público e fundamentos que precisam de conferência em fonte primária.
-Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação.""" 
+Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação. Não use emojis nem símbolos decorativos no texto final. Evite escassez, urgência artificial, “você não vai acreditar”, “segredo”, “imperdível”, “EU QUERO” e outros recursos de pressão. A abertura pode gerar identificação, mas não sensacionalismo. Use no máximo três hashtags, apenas quando forem úteis.""" 
 
 LINGUISTIC_REVIEW_SYSTEM = """Você é revisor sênior de português brasileiro e terminologia jurídica brasileira, com rigor editorial. Analise a peça e apresente uma revisão cuidadosa, sem inventar base legal nem se passar por parecer jurídico.
 Verifique ortografia, acentuação, gramática, concordância, regência, pontuação, sintaxe, naturalidade, clareza, coesão e consistência de termos entre título, slides, roteiro e legenda.
@@ -645,6 +645,137 @@ def review_language_and_legal_precision(draft, preferred_provider=""):
         except Exception as exc:
             errors.append(name + ": " + str(exc))
     raise RuntimeError("Não foi possível executar a revisão com as IAs configuradas. " + " | ".join(errors[:3]))
+
+
+
+COPYWRITER_SYSTEM = """Você é um copywriter editorial sênior especializado em comunicação jurídica brasileira, conteúdo digital e publicidade ética da advocacia.
+Escreva com precisão, naturalidade e domínio de ritmo editorial. O texto deve parecer escrito por um profissional experiente, não por um gerador de frases prontas.
+
+REGRAS EDITORIAIS:
+- Adapte uma estrutura AIDA apenas como progressão informativa: abertura que identifica uma dúvida real; contexto; esclarecimento da regra geral; limites, exceções ou próximos passos informativos.
+- Não use “desejo” para estimular contratação. Não use escassez, urgência artificial, medo, clickbait, “você não vai acreditar”, “segredo que ninguém conta”, “comente EU QUERO”, “me chame”, “contrate” ou chamadas comerciais.
+- Não prometa resultados, não garanta direitos sem considerar requisitos, não estimule litígio e não compare nem engrandeça o profissional.
+- Siga o caráter informativo, a discrição e a sobriedade do Provimento 205/2021 da OAB e do Código de Ética e Disciplina. Evite expressões persuasivas voltadas à contratação, autopromoção, mercantilização, oferta de serviços, preços ou resultados de casos.
+- NÃO use emojis, carinhas, foguetes, sirenes, checkmarks decorativos ou excesso de exclamações. Evite frases feitas, “vamos mergulhar”, “em um mundo cada vez mais”, “é fundamental entender” e conclusões genéricas.
+- Use português brasileiro contemporâneo, ritmo natural, frases de tamanhos variados e exemplos concretos. Explique termos técnicos em linguagem simples sem distorcer seu sentido.
+- Não invente artigos, leis, prazos, decisões, estatísticas, fatos ou fontes. Não afirme que uma regra está vigente se a fonte oficial atualizada não foi fornecida. Liste referências que precisam de conferência.
+- CTA deve ter utilidade pública: salvar para consulta, compartilhar informação, consultar fonte oficial ou enviar uma dúvida geral para pauta futura.
+- Hashtags: zero a três, sem enchimento.
+- Se houver insuficiência de contexto, explicite a limitação em vez de completar com suposições.
+- Produza copy pronta para edição/publicação e sem rótulos internos como “Hook”, “AIDA”, “Atenção”, “Interesse”, “Desejo”, “CTA” ou “Variação 1” no texto final.
+
+Retorne somente JSON válido, sem markdown, com estas chaves:
+{
+  "titulo": "título editorial específico",
+  "abertura": "primeiras linhas da peça, sem clickbait",
+  "copy_principal": "texto principal editável, incluindo a legenda quando o formato pedir",
+  "slides": [{"titulo": "título específico", "texto": "texto do slide"}],
+  "roteiro": [{"cena": "descrição breve", "fala": "fala natural", "texto_na_tela": "texto curto"}],
+  "cta_informativa": "próximo passo informativo",
+  "hashtags": [],
+  "pontos_juridicos_a_conferir": [],
+  "alertas_eticos": [],
+  "nota_editorial": "uma frase sobre a abordagem escolhida"
+}
+Para carrossel, crie de 5 a 7 slides com progressão lógica, sem repetição. Para Reel, roteiro natural de aproximadamente 30 a 45 segundos. Para post estático, uma ideia central e texto curto. Para legenda, escreva uma legenda completa. Para artigo curto, use subtítulos úteis e desenvolvimento coerente. Se a fonte oficial não foi incluída, sinalize os fundamentos legais que dependem de conferência."""
+
+LEGAL_VALIDATION_SYSTEM = """Você é um revisor de referências jurídicas e consistência normativa no Brasil. Seu trabalho é identificar referências citadas, confrontar afirmações com o material primário que foi fornecido e explicar divergências. Você não é uma fonte oficial e não pode alegar pesquisa externa que não foi realizada.
+
+REGRAS OBRIGATÓRIAS:
+1. Trate o texto-fonte anexado pelo usuário como o único material fornecido para confirmar o teor literal de artigo, inciso, parágrafo, número de lei, vigência ou alteração.
+2. Se não houver transcrição relevante da fonte primária, classifique o fundamento como "NÃO VERIFICÁVEL SEM FONTE PRIMÁRIA", mesmo que você reconheça a referência por conhecimento prévio. Um URL isolado não equivale a ter lido seu conteúdo.
+3. Compare número da norma, dispositivo, redação e afirmação jurídica. Diferencie divergência de redação, referência incompleta, possível desatualização e conclusão jurídica que depende dos fatos.
+4. Não invente dispositivos, vigência, redação ou fontes. Não declare uma lei “revogada”, “vigente” ou “atualizada” sem evidência no material fornecido.
+5. Se a fonte apresentada não for oficial, informe que a confirmação definitiva exige fonte primária oficial.
+6. Sugira redação corretiva cautelosa, mas não reescreva como certeza algo que dependa de fatos ou de interpretação. Não substitua a revisão de advogado responsável.
+7. Não invente artigos apenas para completar a resposta. Se não houver referência legal explícita, informe que não foi identificada uma referência expressa.
+8. Retorne apenas JSON válido, sem markdown, neste formato:
+{
+  "status_geral": "CONVERGÊNCIA | DIVERGÊNCIA | PENDENTE DE FONTE",
+  "resumo": "síntese objetiva",
+  "fundamentos": [
+    {
+      "referencia_normalizada": "norma e dispositivo em forma canônica, ou referência não identificada",
+      "afirmacao_no_texto": "afirmação jurídica específica presente no conteúdo",
+      "status": "CONFIRMADO NO TRECHO FORNECIDO | DIVERGÊNCIA COM O TRECHO FORNECIDO | POSSÍVEL ERRO | NÃO VERIFICÁVEL SEM FONTE PRIMÁRIA",
+      "evidencia_da_fonte": "trecho curto da fonte fornecida ou explicar por que não há evidência",
+      "analise": "comparação objetiva",
+      "correcao_sugerida": "redação cautelosa ou ação de revisão",
+      "fonte_primaria_necessaria": "órgão, norma ou página oficial que precisa ser consultada"
+    }
+  ],
+  "alertas_eticos": [],
+  "informacoes_faltantes": []
+}
+Se o texto não tiver dispositivos expressos, inclua um item em fundamentos dizendo isso. Se faltar a fonte primária, seja explícito. Não confunda semelhança de respostas entre modelos com comprovação jurídica."""
+
+def generate_professional_copy(subject, audience, fmt, area, objective, tone, details=""):
+    brief = {
+        "tema_juridico": subject,
+        "publico_alvo": audience,
+        "formato": fmt,
+        "area_do_direito": area,
+        "objetivo_editorial": objective,
+        "tom_de_voz": tone,
+        "contexto_e_fontes_fornecidos": details or "Nenhuma fonte primária foi fornecida."
+    }
+    prompt = (
+        "Redija a peça solicitada usando as regras do sistema. A copy deve ser profissional, específica, sem emojis, "
+        "sem chamada comercial e sem inventar fundamentos.\n\n"
+        + json.dumps(brief, ensure_ascii=False)
+    )
+    providers = [
+        ("Gemini", "GEMINI_API_KEY", call_gemini),
+        ("Groq", "GROQ_API_KEY", call_groq),
+        ("OpenRouter", "OPENROUTER_API_KEY", call_openrouter),
+    ]
+    errors = []
+    for name, key_name, fn in providers:
+        if not secret(key_name).strip():
+            errors.append(name + ": integração não configurada")
+            continue
+        try:
+            result = fn(prompt, system_prompt=COPYWRITER_SYSTEM)
+            if not isinstance(result, dict) or not str(result.get("copy_principal", "")).strip():
+                raise ValueError("A resposta não trouxe copy_principal.")
+            result["_provedor_copy"] = name
+            return result, name
+        except Exception as exc:
+            errors.append(name + ": " + str(exc)[:220])
+    raise RuntimeError("Nenhuma integração de IA conseguiu gerar a copy. " + " | ".join(errors))
+
+def validate_legal_with_three_ais(content, source_material):
+    payload = {
+        "conteudo_a_verificar": content,
+        "texto_da_fonte_primaria_fornecida": source_material or "",
+        "instrucao_de_conferencia": (
+            "Compare cada afirmação e referência jurídica com o texto da fonte que foi efetivamente colado. "
+            "Se o campo da fonte estiver vazio ou contiver apenas URL, marque como não verificável sem fonte primária."
+        )
+    }
+    prompt = (
+        "Faça uma revisão individual e independente do conteúdo abaixo. Não presuma o resultado dos outros revisores. "
+        "Use exatamente o JSON solicitado pelo sistema.\n\n"
+        + json.dumps(payload, ensure_ascii=False)
+    )
+    providers = [
+        ("Gemini", "GEMINI_API_KEY", call_gemini),
+        ("Groq", "GROQ_API_KEY", call_groq),
+        ("OpenRouter", "OPENROUTER_API_KEY", call_openrouter),
+    ]
+    results = []
+    for name, key_name, fn in providers:
+        if not secret(key_name).strip():
+            results.append({"provedor": name, "resultado": None, "erro": "API não configurada", "configurado": False})
+            continue
+        try:
+            result = fn(prompt, system_prompt=LEGAL_VALIDATION_SYSTEM)
+            if not isinstance(result, dict) or not isinstance(result.get("fundamentos"), list):
+                raise ValueError("Resposta fora do formato esperado de validação.")
+            results.append({"provedor": name, "resultado": result, "erro": "", "configurado": True})
+        except Exception as exc:
+            results.append({"provedor": name, "resultado": None, "erro": str(exc)[:350], "configurado": True})
+    return results
 
 PALETTES={
     "Azul-marinho & champanhe":("#F5F1E8","#172842","#B79B61"),
@@ -1225,7 +1356,7 @@ def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="
 
 
 
-st.title("⚖️ AdvFlow")
+st.title("AdvFlow")
 st.caption("Estúdio de conteúdo jurídico informativo • agente de IA • calendário • métricas • radar jurídico")
 with st.sidebar:
     st.markdown(f"**Conta:** {current_user['username']} · {current_user['role']}")
@@ -1239,7 +1370,7 @@ with st.sidebar:
     palette=st.selectbox("Paleta visual",list(PALETTES))
     st.divider()
     st.caption("Use IA como apoio editorial. Revise fontes e conformidade antes de publicar.")
-tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Revisão OAB","Configuração"]
+tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Revisão OAB","Configuração","Copy profissional"]
 if current_user["role"] == "admin":
     tab_labels.append("Usuários")
 tabs=st.tabs(tab_labels)
@@ -1298,7 +1429,7 @@ with tabs[1]:
                     )
                     st.components.v1.html(
                         f"""<div style="font-family:sans-serif;padding:2px 0;">
-                        <button id="copy-carousel-slide" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt deste slide</button>
+                        <button id="copy-carousel-slide" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;cursor:pointer;">Copiar prompt deste slide</button>
                         <span id="copy-carousel-slide-status" style="margin-left:10px;font-size:13px;"></span>
                         <script>
                         const promptText = {json.dumps(slide_prompt, ensure_ascii=False)};
@@ -1401,7 +1532,7 @@ with tabs[1]:
         st.components.v1.html(
             f"""<div style="font-family: sans-serif; padding: 2px 0;">
             <button id="copy-advflow-brief" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">
-            📋 Copiar briefing completo</button>
+            Copiar briefing completo</button>
             <span id="copy-advflow-status" style="margin-left:10px;font-size:13px;"></span>
             <script>
             const brief = {json.dumps(gemini_brief, ensure_ascii=False)};
@@ -1511,7 +1642,7 @@ with tabs[2]:
         st.text_area("Prompt para a imagem completa — texto + arte",value=gemini_final_prompt,height=430,key="gemini_plus_prompt")
         st.components.v1.html(
             f"""<div style="font-family:sans-serif;padding:2px 0;">
-            <button id="copy-gemini-final-art-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">📋 Copiar prompt da arte completa</button>
+            <button id="copy-gemini-final-art-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">Copiar prompt da arte completa</button>
             <span id="copy-gemini-final-art-status" style="margin-left:10px;font-size:13px;"></span>
             <script>
             const finalArtPrompt = {json.dumps(gemini_final_prompt, ensure_ascii=False)};
@@ -1921,6 +2052,89 @@ with tabs[6]:
             else:st.warning(alert)
         st.caption("Triagem lexical preliminar. Não é parecer jurídico nem certificação de conformidade com o Provimento 205/2021 ou outras regras vigentes.")
 
+    st.divider()
+    st.subheader("Validação de fundamentos legais por três integrações de IA")
+    st.caption("As integrações analisam o mesmo conteúdo separadamente e têm seus resultados comparados. Para conferir artigo, inciso, redação ou vigência, cole o trecho da fonte primária oficial; uma URL isolada não comprova que seu conteúdo foi consultado.")
+    legal_content = st.text_area(
+        "Conteúdo jurídico a conferir",
+        height=190,
+        placeholder="Cole a copy, o trecho do artigo, a legenda ou a explicação jurídica...",
+        key="multi_ai_legal_content"
+    )
+    legal_source = st.text_area(
+        "Trecho da fonte primária oficial (obrigatório para confirmação textual)",
+        height=190,
+        placeholder="Cole o texto relevante da legislação ou da página oficial, com nome da norma, dispositivo, órgão e data. Pode incluir o endereço da fonte como referência.",
+        key="multi_ai_legal_source"
+    )
+    if st.button("Comparar fundamentos com Gemini, Groq e OpenRouter", type="primary", key="multi_ai_legal_validate"):
+        if not legal_content.strip():
+            st.warning("Cole o conteúdo jurídico que deseja revisar.")
+        else:
+            with st.spinner("Executando as revisões independentes. A comparação pode demorar, pois cada integração é consultada separadamente..."):
+                st.session_state["multi_ai_legal_results"] = validate_legal_with_three_ais(legal_content, legal_source)
+                st.session_state["multi_ai_legal_content_saved"] = legal_content
+                st.session_state["multi_ai_legal_source_saved"] = legal_source
+
+    legal_results = st.session_state.get("multi_ai_legal_results", [])
+    if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content:
+        successful = [item for item in legal_results if item.get("resultado")]
+        st.write(f"Respostas recebidas: {len(successful)} de 3 integrações configuráveis.")
+        if len(successful) < 3:
+            st.warning("Não houve três respostas válidas. Confira as chaves e os erros abaixo; não trate uma revisão parcial como validação tripla.")
+        if not legal_source.strip():
+            st.warning("Nenhum trecho de fonte primária foi fornecido. Mesmo que os modelos concordem, os artigos e a vigência permanecem pendentes de confirmação oficial.")
+        comparison_rows = []
+        grouped_refs = {}
+        for item in legal_results:
+            provider_name = item.get("provedor", "IA")
+            result = item.get("resultado")
+            if not result:
+                st.error(provider_name + ": " + str(item.get("erro", "não foi possível obter resposta")))
+                continue
+            with st.expander(provider_name + " — " + str(result.get("status_geral", "Resultado da revisão"))):
+                st.write(result.get("resumo", "Sem resumo fornecido."))
+                if result.get("alertas_eticos"):
+                    st.markdown("**Alertas éticos**")
+                    for alert in result.get("alertas_eticos", []):
+                        st.write("- " + str(alert))
+                if result.get("informacoes_faltantes"):
+                    st.markdown("**Informações faltantes**")
+                    for missing in result.get("informacoes_faltantes", []):
+                        st.write("- " + str(missing))
+            for citation in result.get("fundamentos", []):
+                reference = str(citation.get("referencia_normalizada") or citation.get("referencia") or "Referência não identificada")
+                status = str(citation.get("status") or "Status não informado")
+                comparison_rows.append({
+                    "Integração": provider_name,
+                    "Referência": reference,
+                    "Status informado": status,
+                    "Afirmação analisada": str(citation.get("afirmacao_no_texto", "")),
+                    "Correção sugerida": str(citation.get("correcao_sugerida", "")),
+                    "Fonte primária necessária": str(citation.get("fonte_primaria_necessaria", ""))
+                })
+                normalized = unicodedata.normalize("NFKD", reference).encode("ascii", "ignore").decode("ascii").lower()
+                normalized = re.sub(r"[^a-z0-9]", "", normalized)
+                grouped_refs.setdefault(normalized, {"referencia": reference, "entries": []})["entries"].append((provider_name, status))
+        if comparison_rows:
+            st.markdown("**Comparação das referências e correções sugeridas**")
+            st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
+        divergences = []
+        for grouped in grouped_refs.values():
+            statuses = {status.casefold() for _, status in grouped["entries"]}
+            providers_seen = {provider for provider, _ in grouped["entries"]}
+            if len(providers_seen) >= 2 and len(statuses) > 1:
+                divergences.append(grouped)
+        if divergences:
+            st.error("Foram encontradas divergências entre integrações para referências com a mesma identificação textual. Revise esses itens manualmente.")
+            for item in divergences:
+                st.write("**" + item["referencia"] + "**")
+                for provider_name, status in item["entries"]:
+                    st.write("- " + provider_name + ": " + status)
+        elif len(successful) >= 2 and comparison_rows:
+            st.info("Não foram detectadas divergências de status para referências que as integrações identificaram com o mesmo texto. Isso não prova, por si só, que o fundamento esteja juridicamente correto.")
+        st.caption("Limite do método: os provedores podem usar modelos iguais ou diferentes; ausência de divergência não substitui fonte primária atualizada nem a revisão do profissional responsável.")
+
 with tabs[7]:
     st.subheader("Integrações e configuração")
     st.markdown("### Estado do login")
@@ -1960,8 +2174,101 @@ with tabs[7]:
     st.markdown("Links: [Gemini API](https://aistudio.google.com/apikey) · [Groq](https://console.groq.com/keys) · [Streamlit Community Cloud](https://share.streamlit.io)")
 
 
+
+
+with tabs[8]:
+    st.subheader("Copy profissional")
+    st.caption("Criação editorial para marketing jurídico informativo: escrita natural, sem emojis, clickbait, urgência artificial ou chamadas para contratação.")
+    with st.form("professional_copy_form"):
+        copy_col1, copy_col2 = st.columns(2)
+        with copy_col1:
+            copy_subject = st.text_input("Tema jurídico", placeholder="Ex.: cancelamento de compra pela internet")
+            copy_audience = st.selectbox("Público-alvo", AUDIENCE_OPTIONS)
+            copy_area = st.selectbox("Área do Direito", LEGAL_AREAS)
+            copy_format = st.selectbox("Formato", ["Legenda para Instagram", "Carrossel", "Reel", "Post estático", "Artigo curto"])
+        with copy_col2:
+            copy_objective = st.selectbox(
+                "Objetivo editorial",
+                ["Explicar um direito ou dever", "Responder uma dúvida frequente", "Explicar uma mudança normativa", "Evitar erro comum", "Checklist de prevenção", "Desmistificar um conceito"]
+            )
+            copy_tone = st.selectbox(
+                "Tom de voz",
+                ["Didático e natural", "Editorial sofisticado", "Acolhedor e sóbrio", "Analítico e acessível", "Executivo para empresas"]
+            )
+        copy_details = st.text_area(
+            "Contexto, fatos e fonte oficial (opcional)",
+            height=160,
+            placeholder="Cole o trecho oficial, o link como referência e o contexto que deve ser respeitado. Sem o teor da fonte primária, os fundamentos serão sinalizados para conferência."
+        )
+        copy_submit = st.form_submit_button("Gerar copy profissional", type="primary")
+    if copy_submit:
+        if not copy_subject.strip():
+            st.warning("Informe o tema jurídico.")
+        else:
+            try:
+                with st.spinner("Redigindo uma peça editorial e revisando as restrições do briefing..."):
+                    copy_result, copy_provider = generate_professional_copy(
+                        copy_subject, copy_audience, copy_format, copy_area,
+                        copy_objective, copy_tone, copy_details
+                    )
+                st.session_state["professional_copy_result"] = copy_result
+                st.session_state["professional_copy_provider"] = copy_provider
+                st.session_state["professional_copy_main_edit"] = str(copy_result.get("copy_principal", ""))
+            except Exception as exc:
+                st.error("Não foi possível gerar a copy profissional: " + str(exc))
+    pro_copy = st.session_state.get("professional_copy_result")
+    if pro_copy:
+        st.caption("Integração utilizada: " + str(st.session_state.get("professional_copy_provider", "IA")))
+        if pro_copy.get("titulo"):
+            st.markdown("### " + str(pro_copy.get("titulo")))
+        st.text_area("Texto principal editável", value=str(pro_copy.get("copy_principal", "")), height=260, key="professional_copy_main_edit")
+        slides_out = pro_copy.get("slides", [])
+        if slides_out:
+            st.markdown("#### Conteúdo do carrossel")
+            for idx, slide_out in enumerate(slides_out, 1):
+                with st.expander(f"Slide {idx}: {slide_out.get('titulo', 'Sem título')}"):
+                    st.write(slide_out.get("texto", ""))
+        script_out = pro_copy.get("roteiro", [])
+        if script_out:
+            st.markdown("#### Roteiro")
+            st.dataframe(pd.DataFrame(script_out), use_container_width=True, hide_index=True)
+        if pro_copy.get("cta_informativa"):
+            st.markdown("**CTA informativa**")
+            st.write(pro_copy["cta_informativa"])
+        if pro_copy.get("hashtags"):
+            st.markdown("**Hashtags**")
+            st.write(" ".join(str(item) for item in pro_copy.get("hashtags", [])[:3]))
+        if pro_copy.get("pontos_juridicos_a_conferir"):
+            st.markdown("**Fundamentos a conferir em fonte oficial**")
+            for item in pro_copy.get("pontos_juridicos_a_conferir", []):
+                st.write("- " + str(item))
+        if pro_copy.get("alertas_eticos"):
+            st.markdown("**Alertas editoriais e éticos**")
+            for item in pro_copy.get("alertas_eticos", []):
+                st.write("- " + str(item))
+        if pro_copy.get("nota_editorial"):
+            st.caption(str(pro_copy["nota_editorial"]))
+        export_copy = {
+            "titulo": pro_copy.get("titulo", ""),
+            "copy_principal": st.session_state.get("professional_copy_main_edit", ""),
+            "slides": slides_out,
+            "roteiro": script_out,
+            "cta_informativa": pro_copy.get("cta_informativa", ""),
+            "hashtags": pro_copy.get("hashtags", []),
+            "pontos_juridicos_a_conferir": pro_copy.get("pontos_juridicos_a_conferir", []),
+            "alertas_eticos": pro_copy.get("alertas_eticos", [])
+        }
+        st.download_button(
+            "Baixar copy revisável (.txt)",
+            json.dumps(export_copy, ensure_ascii=False, indent=2),
+            file_name="advflow_copy_profissional.txt",
+            mime="text/plain",
+            key="download_professional_copy"
+        )
+        st.caption("Antes de publicar, confira a fonte primária, os fatos e as regras aplicáveis. A geração por IA não certifica conformidade jurídica.")
+
 if current_user["role"] == "admin":
-    with tabs[8]:
+    with tabs[9]:
         st.subheader("Gestão de usuários")
         st.caption("Crie contas individuais para a equipe. A senha temporária é exibida no momento da criação ou redefinição.")
         with st.form("create_user_form"):
