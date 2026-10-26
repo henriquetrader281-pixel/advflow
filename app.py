@@ -42,10 +42,11 @@ with db() as c:
                 c.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
 
 def persistent_auth_enabled():
-    """True when account records are stored in Supabase instead of local SQLite."""
+    """True when Supabase auth settings were supplied; partial setup fails closed instead of using local SQLite."""
     return bool(
         secret("SUPABASE_URL").strip()
-        and (secret("SUPABASE_SECRET_KEY").strip() or secret("SUPABASE_SERVICE_ROLE_KEY").strip())
+        or secret("SUPABASE_SECRET_KEY").strip()
+        or secret("SUPABASE_SERVICE_ROLE_KEY").strip()
     )
 
 def supabase_auth_key():
@@ -59,10 +60,13 @@ def supabase_auth_request(method, params=None, payload=None, prefer=None):
         raise RuntimeError("Configure SUPABASE_URL and SUPABASE_SECRET_KEY in hosting Secrets.")
     headers = {
         "apikey": key,
-        "Authorization": "Bearer " + key,
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
+    # New sb_secret_* API keys are not JWTs and belong in apikey only.
+    # Legacy service_role keys are JWTs and need the Authorization header.
+    if key.startswith("eyJ"):
+        headers["Authorization"] = "Bearer " + key
     if prefer:
         headers["Prefer"] = prefer
     try:
