@@ -221,7 +221,7 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         draw.rectangle((x0,bottom-120,x1,bottom-118),fill=accent)
         if total > 1:
             draw.text((x1-100,bottom-98),f"{index+1:02d}/{total:02d}",font=font(24,True, typography=typography, role="title"),fill=accent)
-        draw.text((x0,bottom-55),disclaimer,font=font(18),fill=muted)
+        draw.text((x0,bottom-55),disclaimer,font=font(18, typography=typography, role="body"),fill=muted)
     else:
         x0, x1 = 88, W-88
         draw.rectangle((0,0,W,14),fill=accent)
