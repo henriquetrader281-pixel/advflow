@@ -2077,7 +2077,7 @@ with tabs[6]:
                 st.session_state["multi_ai_legal_source_saved"] = legal_source
 
     legal_results = st.session_state.get("multi_ai_legal_results", [])
-    if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content:
+    if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content and st.session_state.get("multi_ai_legal_source_saved") == legal_source:
         successful = [item for item in legal_results if item.get("resultado")]
         st.write(f"Respostas recebidas: {len(successful)} de 3 integrações configuráveis.")
         if len(successful) < 3:
@@ -2182,23 +2182,26 @@ with tabs[8]:
     with st.form("professional_copy_form"):
         copy_col1, copy_col2 = st.columns(2)
         with copy_col1:
-            copy_subject = st.text_input("Tema jurídico", placeholder="Ex.: cancelamento de compra pela internet")
-            copy_audience = st.selectbox("Público-alvo", AUDIENCE_OPTIONS)
-            copy_area = st.selectbox("Área do Direito", LEGAL_AREAS)
-            copy_format = st.selectbox("Formato", ["Legenda para Instagram", "Carrossel", "Reel", "Post estático", "Artigo curto"])
+            copy_subject = st.text_input("Tema jurídico", placeholder="Ex.: cancelamento de compra pela internet", key="professional_copy_subject")
+            copy_audience = st.selectbox("Público-alvo", AUDIENCE_OPTIONS, key="professional_copy_audience")
+            copy_area = st.selectbox("Área do Direito", LEGAL_AREAS, key="professional_copy_area")
+            copy_format = st.selectbox("Formato", ["Legenda para Instagram", "Carrossel", "Reel", "Post estático", "Artigo curto"], key="professional_copy_format")
         with copy_col2:
             copy_objective = st.selectbox(
                 "Objetivo editorial",
-                ["Explicar um direito ou dever", "Responder uma dúvida frequente", "Explicar uma mudança normativa", "Evitar erro comum", "Checklist de prevenção", "Desmistificar um conceito"]
+                ["Explicar um direito ou dever", "Responder uma dúvida frequente", "Explicar uma mudança normativa", "Evitar erro comum", "Checklist de prevenção", "Desmistificar um conceito"],
+                key="professional_copy_objective"
             )
             copy_tone = st.selectbox(
                 "Tom de voz",
-                ["Didático e natural", "Editorial sofisticado", "Acolhedor e sóbrio", "Analítico e acessível", "Executivo para empresas"]
+                ["Didático e natural", "Editorial sofisticado", "Acolhedor e sóbrio", "Analítico e acessível", "Executivo para empresas"],
+                key="professional_copy_tone"
             )
         copy_details = st.text_area(
             "Contexto, fatos e fonte oficial (opcional)",
             height=160,
-            placeholder="Cole o trecho oficial, o link como referência e o contexto que deve ser respeitado. Sem o teor da fonte primária, os fundamentos serão sinalizados para conferência."
+            placeholder="Cole o trecho oficial, o link como referência e o contexto que deve ser respeitado. Sem o teor da fonte primária, os fundamentos serão sinalizados para conferência.",
+            key="professional_copy_details"
         )
         copy_submit = st.form_submit_button("Gerar copy profissional", type="primary")
     if copy_submit:
