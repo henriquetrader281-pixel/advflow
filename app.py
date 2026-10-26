@@ -694,35 +694,6 @@ Retorne somente JSON válido, sem markdown, com estas chaves:
 }
 Para carrossel, crie de 5 a 7 slides com progressão lógica, sem repetição. Para Reel, roteiro natural de aproximadamente 30 a 45 segundos. Para post estático, uma ideia central e texto curto. Para legenda, escreva uma legenda completa. Para artigo curto, use subtítulos úteis e desenvolvimento coerente. Se a fonte oficial não foi incluída, sinalize os fundamentos legais que dependem de conferência."""
 
-LEGAL_VALIDATION_SYSTEM = """Você é um revisor de referências jurídicas e consistência normativa no Brasil. Seu trabalho é identificar referências citadas, confrontar afirmações com o material primário que foi fornecido e explicar divergências. Você não é uma fonte oficial e não pode alegar pesquisa externa que não foi realizada.
-
-REGRAS OBRIGATÓRIAS:
-1. Trate o texto-fonte anexado pelo usuário como o único material fornecido para confirmar o teor literal de artigo, inciso, parágrafo, número de lei, vigência ou alteração.
-2. Se não houver transcrição relevante da fonte primária, classifique o fundamento como "NÃO VERIFICÁVEL SEM FONTE PRIMÁRIA", mesmo que você reconheça a referência por conhecimento prévio. Um URL isolado não equivale a ter lido seu conteúdo.
-3. Compare número da norma, dispositivo, redação e afirmação jurídica. Diferencie divergência de redação, referência incompleta, possível desatualização e conclusão jurídica que depende dos fatos.
-4. Não invente dispositivos, vigência, redação ou fontes. Não declare uma lei “revogada”, “vigente” ou “atualizada” sem evidência no material fornecido.
-5. Se a fonte apresentada não for oficial, informe que a confirmação definitiva exige fonte primária oficial.
-6. Sugira redação corretiva cautelosa, mas não reescreva como certeza algo que dependa de fatos ou de interpretação. Não substitua a revisão de advogado responsável.
-7. Não invente artigos apenas para completar a resposta. Se não houver referência legal explícita, informe que não foi identificada uma referência expressa.
-8. Retorne apenas JSON válido, sem markdown, neste formato:
-{
-  "status_geral": "CONVERGÊNCIA | DIVERGÊNCIA | PENDENTE DE FONTE",
-  "resumo": "síntese objetiva",
-  "fundamentos": [
-    {
-      "referencia_normalizada": "norma e dispositivo em forma canônica, ou referência não identificada",
-      "afirmacao_no_texto": "afirmação jurídica específica presente no conteúdo",
-      "status": "CONFIRMADO NO TRECHO FORNECIDO | DIVERGÊNCIA COM O TRECHO FORNECIDO | POSSÍVEL ERRO | NÃO VERIFICÁVEL SEM FONTE PRIMÁRIA",
-      "evidencia_da_fonte": "trecho curto da fonte fornecida ou explicar por que não há evidência",
-      "analise": "comparação objetiva",
-      "correcao_sugerida": "redação cautelosa ou ação de revisão",
-      "fonte_primaria_necessaria": "órgão, norma ou página oficial que precisa ser consultada"
-    }
-  ],
-  "alertas_eticos": [],
-  "informacoes_faltantes": []
-}
-Se o texto não tiver dispositivos expressos, inclua um item em fundamentos dizendo isso. Se faltar a fonte primária, seja explícito. Não confunda semelhança de respostas entre modelos com comprovação jurídica."""
 
 def generate_professional_copy(subject, audience, fmt, area, objective, tone, details=""):
     brief = {
@@ -759,39 +730,6 @@ def generate_professional_copy(subject, audience, fmt, area, objective, tone, de
         except Exception as exc:
             errors.append(name + ": " + str(exc)[:220])
     raise RuntimeError("Nenhuma integração de IA conseguiu gerar a copy. " + " | ".join(errors))
-
-def validate_legal_with_three_ais(content, source_material):
-    payload = {
-        "conteudo_a_verificar": content,
-        "texto_da_fonte_primaria_fornecida": source_material or "",
-        "instrucao_de_conferencia": (
-            "Compare cada afirmação e referência jurídica com o texto da fonte que foi efetivamente colado. "
-            "Se o campo da fonte estiver vazio ou contiver apenas URL, marque como não verificável sem fonte primária."
-        )
-    }
-    prompt = (
-        "Faça uma revisão individual e independente do conteúdo abaixo. Não presuma o resultado dos outros revisores. "
-        "Use exatamente o JSON solicitado pelo sistema.\n\n"
-        + json.dumps(payload, ensure_ascii=False)
-    )
-    providers = [
-        ("Gemini", "GEMINI_API_KEY", call_gemini),
-        ("Groq", "GROQ_API_KEY", call_groq),
-        ("OpenRouter", "OPENROUTER_API_KEY", call_openrouter),
-    ]
-    results = []
-    for name, key_name, fn in providers:
-        if not secret(key_name).strip():
-            results.append({"provedor": name, "resultado": None, "erro": "API não configurada", "configurado": False})
-            continue
-        try:
-            result = fn(prompt, system_prompt=LEGAL_VALIDATION_SYSTEM)
-            if not isinstance(result, dict) or not isinstance(result.get("fundamentos"), list):
-                raise ValueError("Resposta fora do formato esperado de validação.")
-            results.append({"provedor": name, "resultado": result, "erro": "", "configurado": True})
-        except Exception as exc:
-            results.append({"provedor": name, "resultado": None, "erro": str(exc)[:350], "configurado": True})
-    return results
 
 
 DEFAULT_TYPOGRAPHY = "Clássico imponente — Playfair Display + Montserrat"
@@ -1429,7 +1367,7 @@ with st.sidebar:
     palette=st.selectbox("Paleta visual",list(PALETTES))
     st.divider()
     st.caption("Use IA como apoio editorial. Revise fontes e conformidade antes de publicar.")
-tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Configuração"]
+tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Configuração"]
 if current_user["role"] == "admin":
     tab_labels.append("Usuários")
 tabs=st.tabs(tab_labels)
@@ -1439,9 +1377,8 @@ with tabs[0]:
     with db() as c:
         a=c.execute("SELECT COUNT(*) n FROM pieces WHERE user_id=?",(user_id,)).fetchone()["n"]
         b=c.execute("SELECT COUNT(*) n FROM metrics WHERE user_id=?",(user_id,)).fetchone()["n"]
-        cal=c.execute("SELECT COUNT(*) n FROM calendar WHERE user_id=? AND status!='Publicado'",(user_id,)).fetchone()["n"]
-    x,y,z=st.columns(3); x.metric("Peças salvas",a); y.metric("Registros de métricas",b); z.metric("Itens no calendário",cal)
-    st.info("Comece pelo Agente de conteúdo. O AdvFlow salva peças, métricas e calendário no SQLite.")
+    x,y=st.columns(2); x.metric("Peças salvas",a); y.metric("Registros de métricas",b)
+    st.info("Comece pelo Agente de conteúdo. O AdvFlow salva peças e métricas no SQLite.")
 
 with tabs[1]:
     st.subheader("Agente de conteúdo")
@@ -1454,89 +1391,6 @@ with tabs[1]:
                 if alert.startswith("Nenhum"):st.info(alert)
                 else:st.warning(alert)
             st.caption("Triagem lexical preliminar. Não é parecer jurídico nem certificação de conformidade com o Provimento 205/2021 ou outras regras vigentes.")
-
-        st.divider()
-        st.subheader("Validação de fundamentos legais por três integrações de IA")
-        st.caption("As integrações analisam o mesmo conteúdo separadamente e têm seus resultados comparados. Para conferir artigo, inciso, redação ou vigência, cole o trecho da fonte primária oficial; uma URL isolada não comprova que seu conteúdo foi consultado.")
-        legal_content = st.text_area(
-            "Conteúdo jurídico a conferir",
-            height=190,
-            placeholder="Cole a copy, o trecho do artigo, a legenda ou a explicação jurídica...",
-            key="multi_ai_legal_content"
-        )
-        legal_source = st.text_area(
-            "Trecho da fonte primária oficial (obrigatório para confirmação textual)",
-            height=190,
-            placeholder="Cole o texto relevante da legislação ou da página oficial, com nome da norma, dispositivo, órgão e data. Pode incluir o endereço da fonte como referência.",
-            key="multi_ai_legal_source"
-        )
-        if st.button("Comparar fundamentos com Gemini, Groq e OpenRouter", type="primary", key="multi_ai_legal_validate"):
-            if not legal_content.strip():
-                st.warning("Cole o conteúdo jurídico que deseja revisar.")
-            else:
-                with st.spinner("Executando as revisões independentes. A comparação pode demorar, pois cada integração é consultada separadamente..."):
-                    st.session_state["multi_ai_legal_results"] = validate_legal_with_three_ais(legal_content, legal_source)
-                    st.session_state["multi_ai_legal_content_saved"] = legal_content
-                    st.session_state["multi_ai_legal_source_saved"] = legal_source
-
-        legal_results = st.session_state.get("multi_ai_legal_results", [])
-        if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content and st.session_state.get("multi_ai_legal_source_saved") == legal_source:
-            successful = [item for item in legal_results if item.get("resultado")]
-            st.write(f"Respostas recebidas: {len(successful)} de 3 integrações configuráveis.")
-            if len(successful) < 3:
-                st.warning("Não houve três respostas válidas. Confira as chaves e os erros abaixo; não trate uma revisão parcial como validação tripla.")
-            if not legal_source.strip():
-                st.warning("Nenhum trecho de fonte primária foi fornecido. Mesmo que os modelos concordem, os artigos e a vigência permanecem pendentes de confirmação oficial.")
-            comparison_rows = []
-            grouped_refs = {}
-            for item in legal_results:
-                provider_name = item.get("provedor", "IA")
-                result = item.get("resultado")
-                if not result:
-                    st.error(provider_name + ": " + str(item.get("erro", "não foi possível obter resposta")))
-                    continue
-                with st.expander(provider_name + " — " + str(result.get("status_geral", "Resultado da revisão"))):
-                    st.write(result.get("resumo", "Sem resumo fornecido."))
-                    if result.get("alertas_eticos"):
-                        st.markdown("**Alertas éticos**")
-                        for alert in result.get("alertas_eticos", []):
-                            st.write("- " + str(alert))
-                    if result.get("informacoes_faltantes"):
-                        st.markdown("**Informações faltantes**")
-                        for missing in result.get("informacoes_faltantes", []):
-                            st.write("- " + str(missing))
-                for citation in result.get("fundamentos", []):
-                    reference = str(citation.get("referencia_normalizada") or citation.get("referencia") or "Referência não identificada")
-                    status = str(citation.get("status") or "Status não informado")
-                    comparison_rows.append({
-                        "Integração": provider_name,
-                        "Referência": reference,
-                        "Status informado": status,
-                        "Afirmação analisada": str(citation.get("afirmacao_no_texto", "")),
-                        "Correção sugerida": str(citation.get("correcao_sugerida", "")),
-                        "Fonte primária necessária": str(citation.get("fonte_primaria_necessaria", ""))
-                    })
-                    normalized = unicodedata.normalize("NFKD", reference).encode("ascii", "ignore").decode("ascii").lower()
-                    normalized = re.sub(r"[^a-z0-9]", "", normalized)
-                    grouped_refs.setdefault(normalized, {"referencia": reference, "entries": []})["entries"].append((provider_name, status))
-            if comparison_rows:
-                st.markdown("**Comparação das referências e correções sugeridas**")
-                st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
-            divergences = []
-            for grouped in grouped_refs.values():
-                statuses = {status.casefold() for _, status in grouped["entries"]}
-                providers_seen = {provider for provider, _ in grouped["entries"]}
-                if len(providers_seen) >= 2 and len(statuses) > 1:
-                    divergences.append(grouped)
-            if divergences:
-                st.error("Foram encontradas divergências entre integrações para referências com a mesma identificação textual. Revise esses itens manualmente.")
-                for item in divergences:
-                    st.write("**" + item["referencia"] + "**")
-                    for provider_name, status in item["entries"]:
-                        st.write("- " + provider_name + ": " + status)
-            elif len(successful) >= 2 and comparison_rows:
-                st.info("Não foram detectadas divergências de status para referências que as integrações identificaram com o mesmo texto. Isso não prova, por si só, que o fundamento esteja juridicamente correto.")
-            st.caption("Limite do método: os provedores podem usar modelos iguais ou diferentes; ausência de divergência não substitui fonte primária atualizada nem a revisão do profissional responsável.")
 
     brief_version=int(st.session_state.get("brief_version",0))
     subject_key=f"brief_subject_{brief_version}"
@@ -2291,21 +2145,6 @@ with tabs[4]:
     st.caption("Feeds predefinidos: STJ, CNJ, TSE, Agência Câmara e Migalhas. RSS pode ficar indisponível temporariamente. Sempre confira o inteiro teor de decisões, leis e atos em fonte oficial.")
 
 with tabs[5]:
-    st.subheader("Calendário editorial")
-    with st.form("calform"):
-        cd=st.date_input("Data de publicação",value=date.today(),key="cd"); ct=st.time_input("Horário")
-        title=st.text_input("Título / pauta"); cf=st.selectbox("Formato",["Carrossel","Reel","Post estático","Story","Artigo"])
-        status=st.selectbox("Status",["Ideia","Planejado","Em produção","Em revisão","Aprovado","Publicado"]); notes=st.text_input("Observações")
-        add=st.form_submit_button("Adicionar ao calendário")
-    if add and title.strip():
-        with db() as c:c.execute("INSERT INTO calendar(pub_date,pub_time,title,format,status,notes,user_id) VALUES(?,?,?,?,?,?,?)",(str(cd),str(ct),title,cf,status,notes,user_id))
-        st.success("Item adicionado.")
-    with db() as c: calendar=[dict(r) for r in c.execute("SELECT * FROM calendar WHERE user_id=? ORDER BY pub_date,pub_time",(user_id,))]
-    if calendar:
-        dfc=pd.DataFrame(calendar); st.dataframe(dfc,use_container_width=True,hide_index=True)
-        st.download_button("Exportar calendário CSV",dfc.to_csv(index=False).encode("utf-8-sig"),"advflow_calendario.csv","text/csv")
-
-with tabs[6]:
     st.subheader("Integrações e configuração")
     st.markdown("### Estado do login")
     if persistent_auth_enabled():
@@ -2347,7 +2186,7 @@ with tabs[6]:
 
 
 if current_user["role"] == "admin":
-    with tabs[7]:
+    with tabs[6]:
         st.subheader("Gestão de usuários")
         st.caption("Crie contas individuais para a equipe. A senha temporária é exibida no momento da criação ou redefinição.")
         with st.form("create_user_form"):
