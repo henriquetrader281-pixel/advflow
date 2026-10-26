@@ -821,7 +821,7 @@ def typography_guidance(typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
         f"Par obrigatório: título em {spec['title']}; corpo e textos auxiliares em {spec['body']}. "
         f"Formato: {aspect_ratio} ({canvas}). Em uma arte de 1080 px de largura, título de capa entre 60–80 px "
         f"(equivalente aproximado a 45–60 pt no Canva), subtítulos entre 32–37 px, corpo de texto entre 24–29 px "
-        f"e assinatura/rodapé entre 16–19 px. Use negrito apenas para hierarquia, no máximo três níveis tipográficos, "
+        f"e texto auxiliar/rodapé entre 16–19 px (aproximadamente 12–14 pt). Use negrito apenas para hierarquia, no máximo três níveis tipográficos, "
         f"largura de linha confortável, entrelinha generosa, alto contraste e margens seguras. "
         f"Se o texto exceder a capacidade, simplifique a copy sem alterar a regra jurídica ou peça revisão editorial; "
         f"não reduza o corpo abaixo de 22 px, não aperte o espaçamento e não corte palavras. "
