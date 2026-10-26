@@ -617,7 +617,7 @@ def strip_emojis_deep(value):
     return value
 
 def generate(subject, fmt, audience, goal, details="", area="Geral / interdisciplinar", funnel_stage=FUNNEL_STAGES[0], tone=TONE_OPTIONS[0], angle=ANGLE_OPTIONS[0], requested_cta=CTA_OPTIONS[0]):
-    brief=json.dumps({"assunto":subject,"area_do_direito":area,"publico_segmentado":audience,"formato":fmt,"objetivo_editorial":goal,"etapa_do_funil":funnel_stage,"tom_de_voz":tone,"angulo_editorial":angle,"preferencia_de_cta_educativa":requested_cta,"paleta_visual":st.session_state.get("palette_choice","Azul-marinho e dourado"),"contexto_fontes_e_restricoes":details},ensure_ascii=False)
+    brief=json.dumps({"assunto":subject,"area_do_direito":area,"publico_segmentado":audience,"formato":fmt,"objetivo_editorial":goal,"etapa_do_funil":funnel_stage,"tom_de_voz":tone,"angulo_editorial":angle,"preferencia_de_cta_educativa":requested_cta,"paleta_visual":st.session_state.get("studio_palette","Azul-marinho & champanhe"),"contexto_fontes_e_restricoes":details},ensure_ascii=False)
     errors=[]
     for name,fn in [("Gemini",call_gemini),("Groq (alternativo)",call_groq),("OpenRouter (alternativo)",call_openrouter)]:
         try:
@@ -779,6 +779,13 @@ PALETTES={
     "Ameixa & lavanda":("#F5F0F7","#40264B","#A78AB7"),
     "Personalizada":("#F5F1E8","#172842","#B79B61")
 }
+def palette_values(palette):
+    """Accept a named palette or a per-session tuple of background, text, and accent colors."""
+    if isinstance(palette,(tuple,list)) and len(palette)==3:
+        return tuple(palette)
+    return PALETTES[str(palette)]
+
+
 def _rgb(hex_colour):
     value=hex_colour.lstrip("#")
     return tuple(int(value[i:i+2],16) for i in (0,2,4))
@@ -890,7 +897,7 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
     if title.casefold().strip(" :.-") in generic_titles:
         first_sentence = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)[0].strip()
         title = first_sentence if first_sentence and len(first_sentence) <= 95 else "O que isso significa na prática?"
-    bg,ink,accent=PALETTES[palette]
+    bg,ink,accent=palette_values(palette)
     bg_rgb=_rgb(bg); ink_rgb=_rgb(ink); accent_rgb=_rgb(accent)
     output_height=max(1080,int(output_height))
     scale_y=output_height/1350
@@ -936,7 +943,7 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         except Exception:pass
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
-def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
+def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium", visual_type="Cena editorial", visual_density="Equilibrada", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
     """Separa copy textual, direção visual de imagem e instruções de vídeo para o Gemini."""
     slides = draft.get("slides") or []
     text_copy, image_copy = [], []
@@ -991,6 +998,8 @@ ENTREGA DESEJADA
 IDENTIDADE E DIREÇÃO VISUAL
 Paleta: {palette_name}
 Estilo visual: {visual_style}
+Tipo de composição: {visual_type}
+Densidade visual: {visual_density}
 SISTEMA TIPOGRÁFICO OBRIGATÓRIO
 {typography_guidance(typography_name, layout_ratio)}
 Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo. Não acrescente numeração de slides, frações como 1/3 ou marcadores de sequência.
@@ -1034,7 +1043,7 @@ REGRAS IMPORTANTES
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
 
-def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
+def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5", visual_type="Cena editorial", visual_style="Fotografia editorial premium", visual_density="Equilibrada"):
     raw_title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
     body = str(slide.get("texto", "")).strip()
     visual = str(slide.get("visual", "")).strip()
@@ -1053,6 +1062,7 @@ FORMATO E COMPOSIÇÃO
 - Gere exatamente o slide {slide_number}; não substitua por outro slide.
 - Sistema visual consistente em todos os slides: {palette_name}; padrão editorial premium, iluminação sofisticada, materiais realistas e paleta consistente, mas com cena/metáfora visual específica para cada argumento.
 - Acabamento de revista profissional: high-end corporate editorial, sophisticated, trustworthy, calm authority, cinematic yet natural lighting, precise composition and ample safe margins.
+- Preferências visuais escolhidas: tipo {visual_type}; estilo {visual_style}; densidade {visual_density}. Preserve clareza, hierarquia e leitura em celular.
 - SISTEMA TIPOGRÁFICO: {typography_guidance(typography_name, aspect_ratio)}
 - Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
 - Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo. Não inclua numeração de slides, frações como 1/3 ou marcadores de sequência.
@@ -1352,7 +1362,7 @@ def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="
 
 
 st.title("AdvFlow")
-st.caption("Estúdio de conteúdo jurídico informativo • agente de IA • calendário • métricas • radar jurídico")
+st.caption("Conteúdo jurídico informativo • agente de IA • criação visual • radar jurídico")
 with st.sidebar:
     st.markdown(f"**Conta:** {current_user['username']} · {current_user['role']}")
     if st.button("Sair da conta", key="logout_button"):
@@ -1362,10 +1372,9 @@ with st.sidebar:
     st.subheader("Identidade do escritório")
     office=st.text_input("Nome / assinatura",value=secret("OFFICE_NAME","Seu escritório"))
     oab=st.text_input("Identificação OAB (opcional)",value=secret("OFFICE_OAB",""))
-    palette=st.selectbox("Paleta visual",list(PALETTES))
     st.divider()
     st.caption("Use IA como apoio editorial. Revise fontes e conformidade antes de publicar.")
-tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Configuração"]
+tab_labels=["Painel","Agente de conteúdo","Radar jurídico","Configuração"]
 if current_user["role"] == "admin":
     tab_labels.append("Usuários")
 tabs=st.tabs(tab_labels)
@@ -1374,12 +1383,41 @@ with tabs[0]:
     st.subheader("Painel")
     with db() as c:
         a=c.execute("SELECT COUNT(*) n FROM pieces WHERE user_id=?",(user_id,)).fetchone()["n"]
-        b=c.execute("SELECT COUNT(*) n FROM metrics WHERE user_id=?",(user_id,)).fetchone()["n"]
-    x,y=st.columns(2); x.metric("Peças salvas",a); y.metric("Registros de métricas",b)
-    st.info("Comece pelo Agente de conteúdo. O AdvFlow salva peças e métricas no SQLite.")
+    st.metric("Peças salvas",a)
+    st.info("Comece pelo Agente de conteúdo. O AdvFlow salva os rascunhos gerados no SQLite.")
 
 with tabs[1]:
     st.subheader("Agente de conteúdo")
+
+    with st.expander("Identidade visual e formato das artes", expanded=True):
+        palette_options=list(PALETTES)
+        st.session_state.setdefault("studio_palette","Azul-marinho & champanhe")
+        chosen_palette=st.selectbox("Paleta visual",palette_options,key="studio_palette")
+        if chosen_palette=="Personalizada":
+            custom_cols=st.columns(3)
+            custom_bg=custom_cols[0].color_picker("Cor de fundo",value=st.session_state.get("custom_bg","#F5F1E8"),key="custom_bg")
+            custom_ink=custom_cols[1].color_picker("Cor do texto",value=st.session_state.get("custom_ink","#172842"),key="custom_ink")
+            custom_accent=custom_cols[2].color_picker("Cor de destaque",value=st.session_state.get("custom_accent","#B79B61"),key="custom_accent")
+            selected_palette_colors=(custom_bg,custom_ink,custom_accent)
+        else:
+            selected_palette_colors=PALETTES[chosen_palette]
+
+        settings_a,settings_b=st.columns(2)
+        visual_type=settings_a.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],key="studio_visual_type")
+        visual_style=settings_b.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],key="studio_visual_style")
+        settings_c,settings_d=st.columns(2)
+        visual_density=settings_c.selectbox("Densidade visual",["Enxuta","Equilibrada","Rica em detalhes"],index=1,key="studio_visual_density")
+        typography_choice=settings_d.selectbox("Combinação tipográfica",list(TYPOGRAPHY_SPECS),key="studio_typography")
+        st.caption(TYPOGRAPHY_SPECS[typography_choice]["description"]+" Se a fonte não puder ser carregada no servidor, será usada uma alternativa compatível.")
+        ratio_labels={
+            "4:5":"Feed vertical — 4:5 (1080 × 1350)",
+            "1:1":"Feed quadrado — 1:1 (1080 × 1080)",
+            "9:16":"Reels e Stories — 9:16 (1080 × 1920)"
+        }
+        selected_ratio=st.selectbox("Proporção da arte",list(ratio_labels),format_func=lambda ratio:ratio_labels[ratio],key="studio_aspect_ratio")
+        selected_height={"4:5":1350,"1:1":1080,"9:16":1920}[selected_ratio]
+
+    st.divider()
 
     with st.expander("Revisão OAB — triagem ética", expanded=False):
         st.subheader("Triagem de publicidade jurídica")
@@ -1513,9 +1551,9 @@ with tabs[1]:
                     slide_prompt = build_gemini_carousel_slide_prompt(
                         d, s, i, len(d.get("slides", [])),
                         office=office, oab=oab,
-                        palette_name=st.session_state.get("studio_palette", "Identidade do escritório"),
-                        typography_name=st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY),
-                        aspect_ratio=st.session_state.get("studio_aspect_ratio", "4:5")
+                        palette_name=chosen_palette,
+                        typography_name=typography_choice,
+                        aspect_ratio=selected_ratio
                     )
                     st.components.v1.html(
                         f"""<div style="font-family:sans-serif;padding:2px 0;">
@@ -1646,7 +1684,6 @@ with tabs[1]:
         st.link_button("Abrir Gemini para criar a peça", "https://gemini.google.com/", type="primary")
         st.info("O briefing contém duas partes separadas: copy textual e direção criativa de imagem/vídeo. O link abre o Gemini, mas você precisa copiar e colar o briefing. Se a geração de vídeo não estiver disponível na sua conta/conversa, o prompt pede ao Gemini um plano de produção cena a cena em vez de afirmar que gerou o vídeo.")
 
-with tabs[2]:
     st.subheader("Estúdio visual | Gemini Plus, OpenRouter e AdvFlow")
     st.caption("Método editorial: tipo de composição × estilo × paleta. Você pode usar a assinatura do Gemini manualmente ou gerar pela API do OpenRouter, com custo separado.")
     draft=st.session_state.get("draft",{})
@@ -1654,42 +1691,16 @@ with tabs[2]:
     options=[f"{i+1:02d} — {s.get('titulo','Slide')[:65]}" for i,s in enumerate(slides)]
     selected=st.selectbox("Slide que vamos ilustrar",options,index=0)
     slide_idx=options.index(selected); active=slides[slide_idx]
-    title=st.text_input("Título da arte",value=active.get("titulo",draft.get("titulo","Tema jurídico")),key="studio_title")
-    body=st.text_area("Texto que aparecerá na arte",value=active.get("texto",""),height=105,key="studio_body")
+    title=st.text_input("Título da arte",value=active.get("titulo",draft.get("titulo","Tema jurídico")),key=f"studio_title_{slide_idx}")
+    body=st.text_area("Texto que aparecerá na arte",value=active.get("texto",""),height=105,key=f"studio_body_{slide_idx}")
     st.caption("Para assuntos densos, mantenha na arte a ideia principal e deixe a explicação completa na legenda. Isso melhora a leitura em celular.")
-    visual_direction=st.text_area("Direção visual específica",value=active.get("visual",""),height=90,key="studio_direction",help="Detalhe objeto, ambiente, gesto, luz, enquadramento e metáfora visual. Evite apenas 'imagem jurídica'.")
-    visual_type=st.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],index=0,help="Princípio adaptado do fluxo de ilustração do Hermes: definir tipo, estilo e paleta antes de gerar.")
-    visual_style=st.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],index=0)
-    visual_density=st.selectbox("Densidade visual",["Enxuta","Equilibrada","Rica em detalhes"],index=1)
-    typography_choice=st.selectbox(
-        "Combinação tipográfica",
-        list(TYPOGRAPHY_SPECS),
-        index=list(TYPOGRAPHY_SPECS).index(st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY)) if st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY) in TYPOGRAPHY_SPECS else 0,
-        key="studio_typography"
-    )
-    st.caption(TYPOGRAPHY_SPECS[typography_choice]["description"] + " O AdvFlow tenta carregar as fontes em formato TTF no servidor; se a hospedagem estiver sem acesso a elas, usa uma fonte de sistema compatível.")
-    ratio_labels={
-        "4:5": "Feed vertical — 4:5 (1080 × 1350)",
-        "1:1": "Feed quadrado — 1:1 (1080 × 1080)",
-        "9:16": "Reels e Stories — 9:16 (1080 × 1920)"
-    }
-    selected_ratio=st.selectbox(
-        "Formato da arte",
-        list(ratio_labels),
-        index=list(ratio_labels).index(st.session_state.get("studio_aspect_ratio", "4:5")) if st.session_state.get("studio_aspect_ratio", "4:5") in ratio_labels else 0,
-        format_func=lambda ratio: ratio_labels[ratio],
-        key="studio_aspect_ratio"
-    )
-    selected_height={"4:5":1350,"1:1":1080,"9:16":1920}[selected_ratio]
-    palette_options=list(PALETTES)
-    chosen_palette=st.selectbox("Paleta para a arte",palette_options,index=palette_options.index(palette) if palette in palette_options else 0,key="studio_palette")
-    if chosen_palette=="Personalizada":
-        PALETTES["Personalizada"]=(st.session_state.get("custom_bg","#F5F1E8"),st.session_state.get("custom_ink","#172842"),st.session_state.get("custom_accent","#B79B61"))
+    visual_direction=st.text_area("Direção visual específica",value=active.get("visual",""),height=90,key=f"studio_direction_{slide_idx}",help="Detalhe objeto, ambiente, gesto, luz, enquadramento e metáfora visual. Evite apenas 'imagem jurídica'.")
+
     signature=office+(" • "+oab if oab else "")
     area=draft.get("area_direito","Geral / interdisciplinar")
     audience=draft.get("publico","público definido no briefing")
     tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
-    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density,selected_ratio)
+    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,selected_palette_colors,visual_direction,visual_type,visual_density,selected_ratio)
     gemini_final_prompt=build_gemini_final_art_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density,selected_ratio,typography_choice)
     generation_mode=st.radio("Forma de gerar a imagem",["Gemini Plus manual — usa sua assinatura","OpenRouter — geração direta pela API"],index=0,horizontal=True,key="studio_generation_mode")
     if generation_mode=="OpenRouter — geração direta pela API":
@@ -1734,7 +1745,7 @@ with tabs[2]:
                 try:
                     with st.spinner("Gerando imagem profissional com OpenRouter…"):
                         generated=generate_openrouter_image(prompt,chosen_model,model_metadata,reference_bytes,reference_mime,selected_ratio)
-                        final_art=compose_uploaded_art(generated["image_bytes"],title,body,chosen_palette,signature,area,slide_idx+1,len(slides),typography_choice,selected_height)
+                        final_art=compose_uploaded_art(generated["image_bytes"],title,body,selected_palette_colors,signature,area,slide_idx+1,len(slides),typography_choice,selected_height)
                     st.session_state["openrouter_image_final"]=final_art.getvalue()
                     st.session_state["openrouter_image_meta"]=generated
                     st.session_state["openrouter_image_name"]=f"advflow_openrouter_slide_{slide_idx+1:02d}.png"
@@ -1775,249 +1786,12 @@ with tabs[2]:
     with st.expander("Alternativa sem IA"):
         st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada por IA.")
         if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
-            buf=make_art(title,body,chosen_palette,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"),typography=typography_choice,output_height=selected_height)
+            buf=make_art(title,body,selected_palette_colors,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"),typography=typography_choice,output_height=selected_height)
             st.image(buf,use_container_width=True)
             st.download_button("Baixar arte local PNG",buf.getvalue(),"advflow_arte_local.png","image/png",key="download_local_studio_art")
 
-with tabs[3]:
-    st.subheader("Validador de métricas e funil editorial")
-    st.caption("Método: escolha poucos indicadores relevantes, defina antes o nível que pede uma mudança e acompanhe por período, formato e etapa. Os dados são inseridos manualmente; o painel não está conectado ao Instagram/Meta.")
-    with st.expander("Como interpretar este validador",expanded=False):
-        st.write("As metas são definidas pelo próprio escritório e pelo histórico do perfil. O sistema não usa taxas universais como se fossem benchmarks confiáveis.")
-        st.write("Alcance mede distribuição; interações, salvamentos e compartilhamentos medem tipos distintos de resposta; visitas ao perfil e cliques são sinais de próximo passo, não prova de contratação ou de causalidade.")
-        st.write("O painel sinaliza qualidade de dados e se a meta definida foi atingida. Uma publicação isolada ou poucas peças não são suficientes para afirmar que um formato funciona melhor.")
-        st.write("No marketing jurídico, métricas não justificam promessa de resultado, comparação, exposição de casos ou chamada que induza contratação. Revise o conteúdo sob as regras éticas vigentes.")
-    METRIC_DEFS = [
-        ("reach","Alcance médio por publicação","contas","Distribuição: média de contas alcançadas por peça."),
-        ("engagement_rate","Interações / alcance","%","(Curtidas + comentários + salvamentos + compartilhamentos) / alcance total."),
-        ("save_rate","Salvamentos / alcance","%","Sinal de utilidade percebida; não equivale a conversão."),
-        ("share_rate","Compartilhamentos / alcance","%","Sinal de propagação; não é prova de intenção comercial."),
-        ("profile_visit_rate","Visitas ao perfil / alcance","%","Sinal de interesse pelo perfil; comparar janelas compatíveis."),
-        ("click_rate","Cliques em link / visitas ao perfil","%","Indicador-proxy. As fontes e as janelas dos dois dados precisam ser comparáveis.")
-    ]
-    # Targets are personalized, persistent per user, and intentionally have no universal default.
-    with db() as c:
-        target_rows=[dict(r) for r in c.execute("SELECT * FROM metric_targets WHERE user_id=?",(user_id,))]
-    saved_targets={r["metric_key"]:r for r in target_rows}
-    with st.expander("Definir metas e limites de ação",expanded=not bool(target_rows)):
-        st.write("Para cada indicador, defina: **intervir abaixo de** (limite de alerta) e **meta desejada**. Use seu histórico, objetivo editorial e dados comparáveis. Deixe ambos em zero se ainda não tiver base para definir.")
-        with st.form("metric_target_form"):
-            proposed={}
-            for key,label,unit,description in METRIC_DEFS:
-                existing=saved_targets.get(key,{})
-                col_a,col_b=st.columns(2)
-                cap=(f" ({unit})" if unit=="%" else " (contas)")
-                warning=col_a.number_input(f"{label} — intervir abaixo de{cap}",min_value=0.0,value=float(existing.get("warning_value",0.0)),step=(0.1 if unit=="%" else 10.0),key=f"target_warning_{key}")
-                target=col_b.number_input(f"{label} — meta desejada{cap}",min_value=0.0,value=float(existing.get("target_value",0.0)),step=(0.1 if unit=="%" else 10.0),key=f"target_goal_{key}")
-                st.caption(description)
-                proposed[key]=(warning,target,unit,label)
-            save_targets=st.form_submit_button("Salvar metas do meu perfil",type="primary")
-        if save_targets:
-            invalid=[]
-            for key,(warning,target,unit,label) in proposed.items():
-                if (warning>0 or target>0) and not (target>warning>0):
-                    invalid.append(f"{label}: a meta precisa ser maior que o limite de ação, e ambos devem ser maiores que zero.")
-            if invalid:
-                for msg in invalid: st.error(msg)
-            else:
-                with db() as c:
-                    for key,(warning,target,unit,label) in proposed.items():
-                        if target>0 and warning>0:
-                            c.execute("INSERT INTO metric_targets(user_id,metric_key,target_value,warning_value,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(user_id,metric_key) DO UPDATE SET target_value=excluded.target_value,warning_value=excluded.warning_value,updated_at=excluded.updated_at",
-                                      (user_id,key,target,warning,datetime.now().isoformat(timespec="seconds")))
-                        else:
-                            c.execute("DELETE FROM metric_targets WHERE user_id=? AND metric_key=?",(user_id,key))
-                st.success("Metas salvas.")
-                st.rerun()
-    with st.form("metric_form"):
-        mdate=st.date_input("Data da publicação",value=date.today())
-        topic=st.text_input("Tema / título")
-        mformat=st.selectbox("Formato",["Carrossel","Reel","Post estático","Story","Outro"])
-        stage=st.selectbox("Etapa editorial",["Descoberta","Consideração","Relacionamento","Conversão editorial"])
-        objective=st.selectbox("Objetivo principal da peça",["Alcance qualificado","Interações úteis","Salvamentos","Compartilhamentos","Visitas ao perfil","Cliques em link"])
-        cols=st.columns(4)
-        reach=cols[0].number_input("Alcance",min_value=0,step=1)
-        likes=cols[1].number_input("Curtidas",min_value=0,step=1)
-        comments=cols[2].number_input("Comentários",min_value=0,step=1)
-        saves=cols[3].number_input("Salvamentos",min_value=0,step=1)
-        cols2=st.columns(4)
-        shares=cols2[0].number_input("Compartilhamentos",min_value=0,step=1)
-        profile_visits=cols2[1].number_input("Visitas ao perfil atribuídas",min_value=0,step=1)
-        link_clicks=cols2[2].number_input("Cliques em links",min_value=0,step=1)
-        completeness=cols2[3].selectbox("Cobertura dos Insights",["Parcial","Completa"],help="Marque Completa apenas quando registrou os campos relevantes disponíveis para esta peça.")
-        save_m=st.form_submit_button("Registrar publicação e métricas")
-    if save_m:
-        if not topic.strip():
-            st.warning("Informe o tema/título para que as comparações por pauta façam sentido.")
-        else:
-            with db() as c:
-                c.execute("INSERT INTO metrics(post_date,topic,format,reach,likes,comments,saves,shares,user_id,funnel_stage,profile_visits,link_clicks,data_completeness,objective) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                          (str(mdate),topic.strip(),mformat,reach,likes,comments,saves,shares,user_id,stage,profile_visits,link_clicks,completeness,objective))
-            st.success("Métricas registradas.")
-    with db() as c:
-        rows=[dict(r) for r in c.execute("SELECT * FROM metrics WHERE user_id=? ORDER BY post_date DESC",(user_id,))]
-    if rows:
-        df=pd.DataFrame(rows)
-        for col,default in [("profile_visits",0),("link_clicks",0),("funnel_stage","Descoberta"),("data_completeness","Parcial"),("objective","Interações úteis")]:
-            if col not in df.columns: df[col]=default
-        df["date_parsed"]=pd.to_datetime(df["post_date"],errors="coerce")
-        df["stage_key"]=df["funnel_stage"].fillna("Descoberta").astype(str).str.split("|").str[0].str.strip()
-        # Data-quality checks are informational; the app does not silently rewrite historic inputs.
-        bad_dates=int(df["date_parsed"].isna().sum())
-        no_reach=int((df["reach"].fillna(0)<=0).sum())
-        blank_topics=int(df["topic"].fillna("").astype(str).str.strip().eq("").sum())
-        partial_rows=int(df["data_completeness"].fillna("Parcial").ne("Completa").sum())
-        dupes=int(df.duplicated(subset=["post_date","topic","format"],keep=False).sum())
-        with st.expander("Validação da qualidade dos dados",expanded=(bad_dates+no_reach+blank_topics+partial_rows>0)):
-            q1,q2,q3,q4=st.columns(4)
-            q1.metric("Datas inválidas",bad_dates)
-            q2.metric("Sem alcance válido",no_reach)
-            q3.metric("Tema vazio",blank_topics)
-            q4.metric("Dados parciais",partial_rows)
-            if dupes:
-                st.warning(f"{dupes} linhas participam de possíveis duplicatas de data + tema + formato. Confira se alguma publicação foi registrada duas vezes; nenhuma linha foi removida.")
-            if no_reach:
-                st.warning("As taxas com denominador alcance ficam indisponíveis nas linhas com alcance zero. Confirme se o zero significa ausência real de alcance ou dado não coletado.")
-            if partial_rows:
-                st.info("Os registros parciais entram nas contagens brutas, mas recomenda-se não usá-los para concluir sobre cliques, visitas ou a taxa de funil. Marque a cobertura real ao registrar cada publicação.")
-            if bad_dates or blank_topics:
-                st.warning("Corrija datas ou temas vazios na fonte dos dados antes de comparar pautas. As entradas antigas são sinalizadas, não alteradas automaticamente.")
-            if not (bad_dates or no_reach or blank_topics or partial_rows or dupes):
-                st.success("Não foram encontrados alertas básicos de integridade nos registros exibidos. Isso não garante que as métricas de origem estejam corretas.")
-        period_label=st.selectbox("Janela para validação",["Últimos 7 dias","Últimos 30 dias","Últimos 90 dias","Últimos 180 dias","Todo o histórico"],index=0)
-        period_days={"Últimos 7 dias":7,"Últimos 30 dias":30,"Últimos 90 dias":90,"Últimos 180 dias":180,"Todo o histórico":None}[period_label]
-        date_now=pd.Timestamp(date.today())
-        stage_filter=st.selectbox("Filtrar etapa",["Todas","Descoberta","Consideração","Relacionamento","Conversão editorial"])
-        format_filter=st.selectbox("Filtrar formato",["Todos"]+sorted([str(x) for x in df["format"].dropna().unique()]))
-        recent=df.copy()
-        if period_days is not None:
-            cutoff=date_now-pd.Timedelta(days=period_days-1)
-            recent=recent[recent["date_parsed"].between(cutoff,date_now,inclusive="both")]
-        if stage_filter!="Todas": recent=recent[recent["stage_key"]==stage_filter]
-        if format_filter!="Todos": recent=recent[recent["format"]==format_filter]
-        def metric_values(frame):
-            reach_sum=float(frame["reach"].fillna(0).sum()) if len(frame) else 0.0
-            interactions=float(frame[["likes","comments","saves","shares"]].fillna(0).sum().sum()) if len(frame) else 0.0
-            saves_sum=float(frame["saves"].fillna(0).sum()) if len(frame) else 0.0
-            shares_sum=float(frame["shares"].fillna(0).sum()) if len(frame) else 0.0
-            visits_sum=float(frame["profile_visits"].fillna(0).sum()) if len(frame) else 0.0
-            clicks_sum=float(frame["link_clicks"].fillna(0).sum()) if len(frame) else 0.0
-            n=max(int(len(frame)),1)
-            return {
-                "reach":float(frame["reach"].fillna(0).mean()) if len(frame) else 0.0,
-                "engagement_rate":(interactions/reach_sum*100) if reach_sum else None,
-                "save_rate":(saves_sum/reach_sum*100) if reach_sum else None,
-                "share_rate":(shares_sum/reach_sum*100) if reach_sum else None,
-                "profile_visit_rate":(visits_sum/reach_sum*100) if reach_sum else None,
-                "click_rate":(clicks_sum/visits_sum*100) if visits_sum else None,
-                "posts":int(len(frame)),
-                "reach_total":reach_sum,
-                "interactions_total":interactions,
-                "visits_total":visits_sum,
-                "clicks_total":clicks_sum
-            }
-        now_metrics=metric_values(recent)
-        st.markdown("#### Resultado no período")
-        st.caption(f"{len(recent)} publicações no filtro selecionado. Taxas agregadas são calculadas por totais (não por média simples de percentuais), para que o alcance pese no denominador.")
-        if len(recent)==0:
-            st.info("Nenhuma publicação neste recorte. Registre publicações ou amplie o período.")
-        else:
-            cards=[
-                ("reach","Alcance médio / publicação","contas"),
-                ("engagement_rate","Interações / alcance","%"),
-                ("save_rate","Salvamentos / alcance","%"),
-                ("share_rate","Compartilhamentos / alcance","%"),
-                ("profile_visit_rate","Visitas ao perfil / alcance","%"),
-                ("click_rate","Cliques / visitas ao perfil*","%")
-            ]
-            metric_actions={
-                "reach":"Teste uma alteração por vez no gancho, no assunto ou na distribuição. Compare peças do mesmo tipo e da mesma etapa antes de concluir.",
-                "engagement_rate":"Leia separadamente comentários, salvamentos e compartilhamentos. Se o conteúdo recebe poucas interações, teste clareza, especificidade e aderência ao público — não apenas perguntas artificiais.",
-                "save_rate":"Teste um recurso realmente consultável: checklist, distinção conceitual, sequência de documentos ou referência oficial. Evite transformar hipótese em regra absoluta.",
-                "share_rate":"Destaque uma explicação útil para um grupo claramente definido e um resumo fácil de repassar; evite alarmismo ou promessa de resultado.",
-                "profile_visit_rate":"Verifique se o tema, a identificação profissional e a organização do perfil se conectam. Mantenha a comunicação informativa, sem induzir contratação.",
-                "click_rate":"Confira se o link funciona, se o destino corresponde à pauta e se a origem/janela das métricas é comparável. Priorize material informativo ou fonte oficial."
-            }
-            card_cols=st.columns(3)
-            for i,(key,label,unit) in enumerate(cards):
-                value=now_metrics.get(key)
-                target=saved_targets.get(key)
-                if value is None:
-                    display="n/d"; status="Sem denominador suficiente"
-                else:
-                    display=(f"{value:,.1f}".replace(",","X").replace(".",",").replace("X",".")+" contas") if unit=="contas" else f"{value:.2f}%"
-                    if not target:
-                        status="Defina meta e limite para validar"
-                    elif value < float(target["warning_value"]):
-                        status="Abaixo do limite de ação"
-                    elif value >= float(target["target_value"]):
-                        status="Meta atingida"
-                    else:
-                        status="Monitorar: entre limite e meta"
-                with card_cols[i%3]:
-                    st.metric(label,display)
-                    if value is not None and key in saved_targets:
-                        delta_text=f"Alvo: {saved_targets[key]['target_value']:g} {unit} · intervir abaixo de {saved_targets[key]['warning_value']:g}"
-                        st.caption(delta_text)
-                    st.caption(status)
-                    if value is not None and target and value < float(target["warning_value"]):
-                        st.caption("**Próxima hipótese a testar:** "+metric_actions.get(key,"Revise o objetivo e a qualidade da coleta antes de agir."))
-            if len(recent)<5:
-                st.warning("Amostra pequena (menos de 5 publicações neste recorte). Trate a leitura como exploratória e não declare um formato vencedor.")
-            if recent["data_completeness"].fillna("Parcial").ne("Completa").any():
-                st.warning("Há registros parciais no período. Taxas de perfil/cliques podem estar subestimadas se os campos não foram coletados.")
-        # Side-by-side trend against an equally long earlier period, using the same stage/format filters.
-        if period_days is not None:
-            prev_cutoff=cutoff-pd.Timedelta(days=period_days)
-            previous=df[df["date_parsed"].between(prev_cutoff,cutoff-pd.Timedelta(days=1),inclusive="both")].copy()
-            if stage_filter!="Todas": previous=previous[previous["stage_key"]==stage_filter]
-            if format_filter!="Todos": previous=previous[previous["format"]==format_filter]
-            if len(previous) and len(recent):
-                prev_metrics=metric_values(previous)
-                st.markdown("#### Comparação com a janela anterior")
-                st.caption(f"Atual: {len(recent)} publicações · anterior: {len(previous)}. Mudança é descritiva, não prova que uma alteração de conteúdo causou o resultado.")
-                trend_rows=[]
-                for key,label,unit in cards:
-                    current_v=now_metrics.get(key); previous_v=prev_metrics.get(key)
-                    if current_v is None or previous_v is None:
-                        change="n/d"
-                    elif unit=="%":
-                        change=f"{current_v-previous_v:+.2f} p.p."
-                    else:
-                        change=f"{current_v-previous_v:+.1f} contas"
-                    trend_rows.append({"Indicador":label,"Atual":current_v,"Janela anterior":previous_v,"Variação":change})
-                st.dataframe(pd.DataFrame(trend_rows),use_container_width=True,hide_index=True)
-        # Compare formats/stages by computing a ratio of totals for each group.
-        st.markdown("#### Comparação por formato")
-        format_rows=[]
-        for group_name,group in recent.groupby("format",dropna=False):
-            vals=metric_values(group)
-            format_rows.append({"Formato":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Compartilhamentos/alcance %":round(vals["share_rate"],2) if vals["share_rate"] is not None else None})
-        if format_rows:
-            st.dataframe(pd.DataFrame(format_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
-        st.markdown("#### Comparação por etapa do funil")
-        stage_rows=[]
-        for group_name,group in recent.groupby("stage_key",dropna=False):
-            vals=metric_values(group)
-            stage_rows.append({"Etapa":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Visitas/alcance %":round(vals["profile_visit_rate"],2) if vals["profile_visit_rate"] is not None else None})
-        if stage_rows:
-            st.dataframe(pd.DataFrame(stage_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
-        st.markdown("#### Comparação por objetivo informado")
-        objective_rows=[]
-        for group_name,group in recent.groupby("objective",dropna=False):
-            vals=metric_values(group)
-            objective_rows.append({"Objetivo":str(group_name),"Publicações":vals["posts"],"Alcance médio":round(vals["reach"],1),"Interações/alcance %":round(vals["engagement_rate"],2) if vals["engagement_rate"] is not None else None,"Salvamentos/alcance %":round(vals["save_rate"],2) if vals["save_rate"] is not None else None,"Compartilhamentos/alcance %":round(vals["share_rate"],2) if vals["share_rate"] is not None else None,"Visitas/alcance %":round(vals["profile_visit_rate"],2) if vals["profile_visit_rate"] is not None else None})
-        if objective_rows:
-            st.dataframe(pd.DataFrame(objective_rows).sort_values("Publicações",ascending=False),use_container_width=True,hide_index=True)
-        st.caption("Leitura semanal recomendada: escolha 2–3 indicadores que correspondam ao objetivo da publicação e defina de antemão qual valor acionará uma revisão. Não tente otimizar todos os números ao mesmo tempo.")
-        show_all=st.checkbox("Ver tabela completa de publicações",value=False)
-        if show_all:
-            display_df=df.drop(columns=["date_parsed"],errors="ignore").copy()
-            st.dataframe(display_df,use_container_width=True,hide_index=True)
-        st.download_button("Exportar registros CSV",df.drop(columns=["date_parsed"],errors="ignore").to_csv(index=False).encode("utf-8-sig"),"advflow_metricas.csv","text/csv")
-    else:
-        st.info("Ainda não há métricas. Comece registrando publicações e os dados disponíveis nos Insights.")
-with tabs[4]:
+
+with tabs[2]:
     st.subheader("Radar jurídico | notícias com utilidade editorial")
     st.caption("Fontes oficiais e portais jurídicos, com filtros temáticos, data e relevância estimada. A classificação automática serve para organizar pautas, não para validar teses jurídicas.")
     NEWS_SOURCES = {
@@ -2142,7 +1916,7 @@ with tabs[4]:
         st.info("Clique em Atualizar radar para consultar as fontes. Depois filtre por área, período ou termo.")
     st.caption("Feeds predefinidos: STJ, CNJ, TSE, Agência Câmara e Migalhas. RSS pode ficar indisponível temporariamente. Sempre confira o inteiro teor de decisões, leis e atos em fonte oficial.")
 
-with tabs[5]:
+with tabs[3]:
     st.subheader("Integrações e configuração")
     st.markdown("### Estado do login")
     if persistent_auth_enabled():
@@ -2172,8 +1946,8 @@ with tabs[5]:
         except Exception as exc:
             st.error("Falha no teste OpenRouter: "+str(exc))
     st.markdown("- **RSS:** feeds públicos configuráveis.")
-    st.markdown("- **Instagram/Meta:** métricas são manuais; publicação, Insights e agendamento não estão conectados.")
-    st.markdown("- **Armazenamento de conteúdo:** peças, métricas e calendário ainda usam SQLite local; migre esses dados para um banco persistente antes de depender deles em produção.")
+    st.markdown("- **Instagram/Meta:** publicação automática, Insights e agendamento não estão conectados nesta versão.")
+    st.markdown("- **Armazenamento de conteúdo:** os rascunhos salvos usam SQLite local; migre os dados para um banco persistente antes de depender deles em produção.")
     st.markdown("- **Login:** se SUPABASE_URL e SUPABASE_SECRET_KEY estiverem configurados, as contas e hashes de senha ficam em public.advflow_users no Supabase. Caso contrário, o login usa SQLite local e pode ser perdido. Senhas usam PBKDF2, cinco falhas bloqueiam o acesso por 15 minutos e cada conta vê apenas os próprios dados.")
     st.markdown("- **Recuperação:** o administrador redefine a senha; o usuário recebe uma senha temporária e precisa trocá-la. Não há envio de e-mails nesta versão.")
     st.markdown("- **Segurança:** nunca coloque chaves de API nem senhas no GitHub. Configure chaves no painel Secrets do Streamlit.")
@@ -2184,7 +1958,7 @@ with tabs[5]:
 
 
 if current_user["role"] == "admin":
-    with tabs[6]:
+    with tabs[4]:
         st.subheader("Gestão de usuários")
         st.caption("Crie contas individuais para a equipe. A senha temporária é exibida no momento da criação ou redefinição.")
         with st.form("create_user_form"):
