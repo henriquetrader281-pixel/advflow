@@ -225,7 +225,7 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         for line in title_lines:
             draw.text((x0,y),line,font=title_font,fill=ink); y += title_step
         y += 12
-        body_font, body_lines, body_step = fit(draw,body,x1-x0,max(30,max_y-y),[30,28,26,24,22],False,1.35,4,typography)
+        body_font, body_lines, body_step = fit(draw,body,x1-x0,max(30,max_y-y),[32,30,28,26,24],False,1.38,6,typography)
         for line in body_lines:
             draw.text((x0,y),line,font=body_font,fill=muted); y += body_step
         draw.rectangle((x0,bottom-120,x1,bottom-118),fill=accent)
@@ -240,7 +240,7 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         for line in title_lines:
             draw.text((x0,y),line,font=title_font,fill=ink); y += title_step
         y += 32
-        body_font,body_lines,body_step=fit(draw,body,x1-x0,max(80,height-300-y),[29,27,25,24,22],False,1.4,10,typography)
+        body_font,body_lines,body_step=fit(draw,body,x1-x0,max(80,height-300-y),[31,29,27,25,24],False,1.42,10,typography)
         for line in body_lines:
             draw.text((x0,y),line,font=body_font,fill=muted); y += body_step
         draw.text((x0,height-78),disclaimer,font=font(19, typography=typography, role="body"),fill=muted)
