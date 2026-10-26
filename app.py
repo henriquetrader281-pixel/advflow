@@ -1429,7 +1429,7 @@ with st.sidebar:
     palette=st.selectbox("Paleta visual",list(PALETTES))
     st.divider()
     st.caption("Use IA como apoio editorial. Revise fontes e conformidade antes de publicar.")
-tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Revisão OAB","Configuração"]
+tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Configuração"]
 if current_user["role"] == "admin":
     tab_labels.append("Usuários")
 tabs=st.tabs(tab_labels)
@@ -1445,6 +1445,99 @@ with tabs[0]:
 
 with tabs[1]:
     st.subheader("Agente de conteúdo")
+
+    with st.expander("Revisão OAB e conferência jurídica", expanded=False):
+        st.subheader("Triagem de publicidade jurídica")
+        text_to_check=st.text_area("Cole a legenda, roteiro ou texto da arte",height=220)
+        if st.button("Analisar texto"):
+            for alert in review(text_to_check):
+                if alert.startswith("Nenhum"):st.info(alert)
+                else:st.warning(alert)
+            st.caption("Triagem lexical preliminar. Não é parecer jurídico nem certificação de conformidade com o Provimento 205/2021 ou outras regras vigentes.")
+
+        st.divider()
+        st.subheader("Validação de fundamentos legais por três integrações de IA")
+        st.caption("As integrações analisam o mesmo conteúdo separadamente e têm seus resultados comparados. Para conferir artigo, inciso, redação ou vigência, cole o trecho da fonte primária oficial; uma URL isolada não comprova que seu conteúdo foi consultado.")
+        legal_content = st.text_area(
+            "Conteúdo jurídico a conferir",
+            height=190,
+            placeholder="Cole a copy, o trecho do artigo, a legenda ou a explicação jurídica...",
+            key="multi_ai_legal_content"
+        )
+        legal_source = st.text_area(
+            "Trecho da fonte primária oficial (obrigatório para confirmação textual)",
+            height=190,
+            placeholder="Cole o texto relevante da legislação ou da página oficial, com nome da norma, dispositivo, órgão e data. Pode incluir o endereço da fonte como referência.",
+            key="multi_ai_legal_source"
+        )
+        if st.button("Comparar fundamentos com Gemini, Groq e OpenRouter", type="primary", key="multi_ai_legal_validate"):
+            if not legal_content.strip():
+                st.warning("Cole o conteúdo jurídico que deseja revisar.")
+            else:
+                with st.spinner("Executando as revisões independentes. A comparação pode demorar, pois cada integração é consultada separadamente..."):
+                    st.session_state["multi_ai_legal_results"] = validate_legal_with_three_ais(legal_content, legal_source)
+                    st.session_state["multi_ai_legal_content_saved"] = legal_content
+                    st.session_state["multi_ai_legal_source_saved"] = legal_source
+
+        legal_results = st.session_state.get("multi_ai_legal_results", [])
+        if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content and st.session_state.get("multi_ai_legal_source_saved") == legal_source:
+            successful = [item for item in legal_results if item.get("resultado")]
+            st.write(f"Respostas recebidas: {len(successful)} de 3 integrações configuráveis.")
+            if len(successful) < 3:
+                st.warning("Não houve três respostas válidas. Confira as chaves e os erros abaixo; não trate uma revisão parcial como validação tripla.")
+            if not legal_source.strip():
+                st.warning("Nenhum trecho de fonte primária foi fornecido. Mesmo que os modelos concordem, os artigos e a vigência permanecem pendentes de confirmação oficial.")
+            comparison_rows = []
+            grouped_refs = {}
+            for item in legal_results:
+                provider_name = item.get("provedor", "IA")
+                result = item.get("resultado")
+                if not result:
+                    st.error(provider_name + ": " + str(item.get("erro", "não foi possível obter resposta")))
+                    continue
+                with st.expander(provider_name + " — " + str(result.get("status_geral", "Resultado da revisão"))):
+                    st.write(result.get("resumo", "Sem resumo fornecido."))
+                    if result.get("alertas_eticos"):
+                        st.markdown("**Alertas éticos**")
+                        for alert in result.get("alertas_eticos", []):
+                            st.write("- " + str(alert))
+                    if result.get("informacoes_faltantes"):
+                        st.markdown("**Informações faltantes**")
+                        for missing in result.get("informacoes_faltantes", []):
+                            st.write("- " + str(missing))
+                for citation in result.get("fundamentos", []):
+                    reference = str(citation.get("referencia_normalizada") or citation.get("referencia") or "Referência não identificada")
+                    status = str(citation.get("status") or "Status não informado")
+                    comparison_rows.append({
+                        "Integração": provider_name,
+                        "Referência": reference,
+                        "Status informado": status,
+                        "Afirmação analisada": str(citation.get("afirmacao_no_texto", "")),
+                        "Correção sugerida": str(citation.get("correcao_sugerida", "")),
+                        "Fonte primária necessária": str(citation.get("fonte_primaria_necessaria", ""))
+                    })
+                    normalized = unicodedata.normalize("NFKD", reference).encode("ascii", "ignore").decode("ascii").lower()
+                    normalized = re.sub(r"[^a-z0-9]", "", normalized)
+                    grouped_refs.setdefault(normalized, {"referencia": reference, "entries": []})["entries"].append((provider_name, status))
+            if comparison_rows:
+                st.markdown("**Comparação das referências e correções sugeridas**")
+                st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
+            divergences = []
+            for grouped in grouped_refs.values():
+                statuses = {status.casefold() for _, status in grouped["entries"]}
+                providers_seen = {provider for provider, _ in grouped["entries"]}
+                if len(providers_seen) >= 2 and len(statuses) > 1:
+                    divergences.append(grouped)
+            if divergences:
+                st.error("Foram encontradas divergências entre integrações para referências com a mesma identificação textual. Revise esses itens manualmente.")
+                for item in divergences:
+                    st.write("**" + item["referencia"] + "**")
+                    for provider_name, status in item["entries"]:
+                        st.write("- " + provider_name + ": " + status)
+            elif len(successful) >= 2 and comparison_rows:
+                st.info("Não foram detectadas divergências de status para referências que as integrações identificaram com o mesmo texto. Isso não prova, por si só, que o fundamento esteja juridicamente correto.")
+            st.caption("Limite do método: os provedores podem usar modelos iguais ou diferentes; ausência de divergência não substitui fonte primária atualizada nem a revisão do profissional responsável.")
+
     brief_version=int(st.session_state.get("brief_version",0))
     subject_key=f"brief_subject_{brief_version}"
     details_key=f"brief_details_{brief_version}"
@@ -2213,98 +2306,6 @@ with tabs[5]:
         st.download_button("Exportar calendário CSV",dfc.to_csv(index=False).encode("utf-8-sig"),"advflow_calendario.csv","text/csv")
 
 with tabs[6]:
-    st.subheader("Triagem de publicidade jurídica")
-    text_to_check=st.text_area("Cole a legenda, roteiro ou texto da arte",height=220)
-    if st.button("Analisar texto"):
-        for alert in review(text_to_check):
-            if alert.startswith("Nenhum"):st.info(alert)
-            else:st.warning(alert)
-        st.caption("Triagem lexical preliminar. Não é parecer jurídico nem certificação de conformidade com o Provimento 205/2021 ou outras regras vigentes.")
-
-    st.divider()
-    st.subheader("Validação de fundamentos legais por três integrações de IA")
-    st.caption("As integrações analisam o mesmo conteúdo separadamente e têm seus resultados comparados. Para conferir artigo, inciso, redação ou vigência, cole o trecho da fonte primária oficial; uma URL isolada não comprova que seu conteúdo foi consultado.")
-    legal_content = st.text_area(
-        "Conteúdo jurídico a conferir",
-        height=190,
-        placeholder="Cole a copy, o trecho do artigo, a legenda ou a explicação jurídica...",
-        key="multi_ai_legal_content"
-    )
-    legal_source = st.text_area(
-        "Trecho da fonte primária oficial (obrigatório para confirmação textual)",
-        height=190,
-        placeholder="Cole o texto relevante da legislação ou da página oficial, com nome da norma, dispositivo, órgão e data. Pode incluir o endereço da fonte como referência.",
-        key="multi_ai_legal_source"
-    )
-    if st.button("Comparar fundamentos com Gemini, Groq e OpenRouter", type="primary", key="multi_ai_legal_validate"):
-        if not legal_content.strip():
-            st.warning("Cole o conteúdo jurídico que deseja revisar.")
-        else:
-            with st.spinner("Executando as revisões independentes. A comparação pode demorar, pois cada integração é consultada separadamente..."):
-                st.session_state["multi_ai_legal_results"] = validate_legal_with_three_ais(legal_content, legal_source)
-                st.session_state["multi_ai_legal_content_saved"] = legal_content
-                st.session_state["multi_ai_legal_source_saved"] = legal_source
-
-    legal_results = st.session_state.get("multi_ai_legal_results", [])
-    if legal_results and st.session_state.get("multi_ai_legal_content_saved") == legal_content and st.session_state.get("multi_ai_legal_source_saved") == legal_source:
-        successful = [item for item in legal_results if item.get("resultado")]
-        st.write(f"Respostas recebidas: {len(successful)} de 3 integrações configuráveis.")
-        if len(successful) < 3:
-            st.warning("Não houve três respostas válidas. Confira as chaves e os erros abaixo; não trate uma revisão parcial como validação tripla.")
-        if not legal_source.strip():
-            st.warning("Nenhum trecho de fonte primária foi fornecido. Mesmo que os modelos concordem, os artigos e a vigência permanecem pendentes de confirmação oficial.")
-        comparison_rows = []
-        grouped_refs = {}
-        for item in legal_results:
-            provider_name = item.get("provedor", "IA")
-            result = item.get("resultado")
-            if not result:
-                st.error(provider_name + ": " + str(item.get("erro", "não foi possível obter resposta")))
-                continue
-            with st.expander(provider_name + " — " + str(result.get("status_geral", "Resultado da revisão"))):
-                st.write(result.get("resumo", "Sem resumo fornecido."))
-                if result.get("alertas_eticos"):
-                    st.markdown("**Alertas éticos**")
-                    for alert in result.get("alertas_eticos", []):
-                        st.write("- " + str(alert))
-                if result.get("informacoes_faltantes"):
-                    st.markdown("**Informações faltantes**")
-                    for missing in result.get("informacoes_faltantes", []):
-                        st.write("- " + str(missing))
-            for citation in result.get("fundamentos", []):
-                reference = str(citation.get("referencia_normalizada") or citation.get("referencia") or "Referência não identificada")
-                status = str(citation.get("status") or "Status não informado")
-                comparison_rows.append({
-                    "Integração": provider_name,
-                    "Referência": reference,
-                    "Status informado": status,
-                    "Afirmação analisada": str(citation.get("afirmacao_no_texto", "")),
-                    "Correção sugerida": str(citation.get("correcao_sugerida", "")),
-                    "Fonte primária necessária": str(citation.get("fonte_primaria_necessaria", ""))
-                })
-                normalized = unicodedata.normalize("NFKD", reference).encode("ascii", "ignore").decode("ascii").lower()
-                normalized = re.sub(r"[^a-z0-9]", "", normalized)
-                grouped_refs.setdefault(normalized, {"referencia": reference, "entries": []})["entries"].append((provider_name, status))
-        if comparison_rows:
-            st.markdown("**Comparação das referências e correções sugeridas**")
-            st.dataframe(pd.DataFrame(comparison_rows), use_container_width=True, hide_index=True)
-        divergences = []
-        for grouped in grouped_refs.values():
-            statuses = {status.casefold() for _, status in grouped["entries"]}
-            providers_seen = {provider for provider, _ in grouped["entries"]}
-            if len(providers_seen) >= 2 and len(statuses) > 1:
-                divergences.append(grouped)
-        if divergences:
-            st.error("Foram encontradas divergências entre integrações para referências com a mesma identificação textual. Revise esses itens manualmente.")
-            for item in divergences:
-                st.write("**" + item["referencia"] + "**")
-                for provider_name, status in item["entries"]:
-                    st.write("- " + provider_name + ": " + status)
-        elif len(successful) >= 2 and comparison_rows:
-            st.info("Não foram detectadas divergências de status para referências que as integrações identificaram com o mesmo texto. Isso não prova, por si só, que o fundamento esteja juridicamente correto.")
-        st.caption("Limite do método: os provedores podem usar modelos iguais ou diferentes; ausência de divergência não substitui fonte primária atualizada nem a revisão do profissional responsável.")
-
-with tabs[7]:
     st.subheader("Integrações e configuração")
     st.markdown("### Estado do login")
     if persistent_auth_enabled():
@@ -2346,7 +2347,7 @@ with tabs[7]:
 
 
 if current_user["role"] == "admin":
-    with tabs[8]:
+    with tabs[7]:
         st.subheader("Gestão de usuários")
         st.caption("Crie contas individuais para a equipe. A senha temporária é exibida no momento da criação ou redefinição.")
         with st.form("create_user_form"):
