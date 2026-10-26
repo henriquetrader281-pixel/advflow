@@ -954,18 +954,21 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         title = first_sentence if first_sentence and len(first_sentence) <= 95 else "O que isso significa na prática?"
     bg,ink,accent=PALETTES[palette]
     bg_rgb=_rgb(bg); ink_rgb=_rgb(ink); accent_rgb=_rgb(accent)
-    im=Image.new("RGB",(1080,1350),bg_rgb); d=ImageDraw.Draw(im)
-    for y in range(1350):
-        t=y/1349; colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72); d.line((0,y,1080,y),fill=colour)
+    output_height=max(1080,int(output_height))
+    scale_y=output_height/1350
+    sy=lambda value: int(round(value*scale_y))
+    im=Image.new("RGB",(1080,output_height),bg_rgb); d=ImageDraw.Draw(im)
+    for y in range(output_height):
+        t=y/max(output_height-1,1); colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72); d.line((0,y,1080,y),fill=colour)
     import imagem
     def font(sz,bold=False):
         return imagem.font(sz, bold, typography, "title" if bold else "body")
     soft=_blend(bg_rgb,accent_rgb,.15); very_soft=_blend(bg_rgb,accent_rgb,.075)
-    d.rectangle((0,0,1080,18),fill=accent_rgb); d.ellipse((650,-190,1230,390),fill=soft); d.ellipse((760,-95,1140,285),outline=accent_rgb,width=3)
+    d.rectangle((0,0,1080,18),fill=accent_rgb); d.ellipse((650,sy(-190),1230,sy(390)),fill=soft); d.ellipse((760,sy(-95),1140,sy(285)),outline=accent_rgb,width=3)
     icon_kind=_topic_icon(area); stage_short=(funnel_stage.split("|")[0].strip() if "|" in funnel_stage else funnel_stage).upper()
-    d.rounded_rectangle((70,56,675,102),radius=18,fill=very_soft,outline=accent_rgb,width=1)
-    d.text((91,68),f"{area.upper()}  /  {stage_short}"[:47],font=font(18,True),fill=ink_rgb)
-    _draw_icon(d,icon_kind,850,245,250,ink_rgb,accent_rgb,bg_rgb)
+    d.rounded_rectangle((70,sy(56),675,sy(102)),radius=18,fill=very_soft,outline=accent_rgb,width=1)
+    d.text((91,sy(68)),f"{area.upper()}  /  {stage_short}"[:47],font=font(18,True),fill=ink_rgb)
+    _draw_icon(d,icon_kind,850,sy(245),250,ink_rgb,accent_rgb,bg_rgb)
     def wrapped(txt,x,y,ft,max_width,color,leading,max_lines=8):
         words=str(txt or "").split(); lines=[]; line=""
         for word in words:
@@ -977,23 +980,23 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         if len(lines)>max_lines:d.text((x,y),"…",font=ft,fill=color);y+=leading
         return y
     if slide_index==1:
-        y=wrapped(title,72,470,font(78 if len(str(title))<43 else 64,True),930,ink_rgb,84,3)
+        y=wrapped(title,72,sy(470),font(78 if len(str(title))<43 else 64,True),930,ink_rgb,84,3)
         d.rounded_rectangle((72,y+12,280,y+19),radius=3,fill=accent_rgb)
         wrapped(body,72,y+53,font(29),900,ink_rgb,39,7)
     else:
-        d.text((72,160),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
-        y=wrapped(title,72,208,font(66 if len(str(title))<42 else 56,True),910,ink_rgb,72,3)
+        d.text((72,sy(160)),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
+        y=wrapped(title,72,sy(208),font(66 if len(str(title))<42 else 56,True),910,ink_rgb,72,3)
         d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb);y+=45
-        d.rounded_rectangle((54,y-12,1025,1110),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
+        d.rounded_rectangle((54,y-12,1025,sy(1110)),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
         d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
         wrapped(body,86,y+45,font(28),855,ink_rgb,39,10)
-    d.line((72,1204,1008,1204),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
-    d.text((72,1242),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
-    d.text((935,1302),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
+    d.line((72,sy(1204),1008,sy(1204)),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
+    d.text((72,sy(1242)),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
+    d.text((935,sy(1302)),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
     if logo_bytes:
         try:
             logo=Image.open(io.BytesIO(logo_bytes)).convert("RGBA");logo.thumbnail((150,70))
-            im_rgba=im.convert("RGBA");im_rgba.alpha_composite(logo,(900-logo.width,1170-logo.height));im=im_rgba.convert("RGB")
+            im_rgba=im.convert("RGBA");im_rgba.alpha_composite(logo,(900-logo.width,sy(1170)-logo.height));im=im_rgba.convert("RGB")
         except Exception:pass
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
@@ -1479,7 +1482,9 @@ with tabs[1]:
                     slide_prompt = build_gemini_carousel_slide_prompt(
                         d, s, i, len(d.get("slides", [])),
                         office=office, oab=oab,
-                        palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
+                        palette_name=st.session_state.get("studio_palette", "Identidade do escritório"),
+                        typography_name=st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY),
+                        aspect_ratio=st.session_state.get("studio_aspect_ratio", "4:5")
                     )
                     st.components.v1.html(
                         f"""<div style="font-family:sans-serif;padding:2px 0;">
@@ -1580,7 +1585,9 @@ with tabs[1]:
             d, fmt=fmt if "fmt" in locals() else str(d.get("formato", "Carrossel")),
             audience=str(d.get("publico", audience if "audience" in locals() else "público geral")),
             office=office, oab=oab,
-            palette_name=st.session_state.get("studio_palette", "Identidade do escritório")
+            palette_name=st.session_state.get("studio_palette", "Identidade do escritório"),
+            typography_name=st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY),
+            aspect_ratio=st.session_state.get("studio_aspect_ratio", "4:5")
         )
         st.text_area("Briefing completo — copy textual + copy de imagem/vídeo", value=gemini_brief, height=420, key="gemini_full_piece_brief")
         st.components.v1.html(
@@ -1621,6 +1628,27 @@ with tabs[2]:
     visual_type=st.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],index=0,help="Princípio adaptado do fluxo de ilustração do Hermes: definir tipo, estilo e paleta antes de gerar.")
     visual_style=st.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],index=0)
     visual_density=st.selectbox("Densidade visual",["Enxuta","Equilibrada","Rica em detalhes"],index=1)
+    typography_choice=st.selectbox(
+        "Combinação tipográfica",
+        list(TYPOGRAPHY_SPECS),
+        index=list(TYPOGRAPHY_SPECS).index(st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY)) if st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY) in TYPOGRAPHY_SPECS else 0,
+        key="studio_typography"
+    )
+    st.caption(TYPOGRAPHY_SPECS[typography_choice]["description"] + " O AdvFlow tenta carregar as fontes em formato TTF no servidor; se a hospedagem estiver sem acesso a elas, usa uma fonte de sistema compatível.")
+    ratio_labels={
+        "Feed vertical — 4:5 (1080 × 1350)": "4:5",
+        "Feed quadrado — 1:1 (1080 × 1080)": "1:1",
+        "Reels e Stories — 9:16 (1080 × 1920)": "9:16"
+    }
+    ratio_label=st.selectbox(
+        "Formato da arte",
+        list(ratio_labels),
+        index=list(ratio_labels.values()).index(st.session_state.get("studio_aspect_ratio", "4:5")) if st.session_state.get("studio_aspect_ratio", "4:5") in ratio_labels.values() else 0,
+        key="studio_aspect_ratio_label"
+    )
+    selected_ratio=ratio_labels[ratio_label]
+    st.session_state["studio_aspect_ratio"]=selected_ratio
+    selected_height={"4:5":1350,"1:1":1080,"9:16":1920}[selected_ratio]
     palette_options=list(PALETTES)
     chosen_palette=st.selectbox("Paleta para a arte",palette_options,index=palette_options.index(palette) if palette in palette_options else 0,key="studio_palette")
     if chosen_palette=="Personalizada":
@@ -1629,8 +1657,8 @@ with tabs[2]:
     area=draft.get("area_direito","Geral / interdisciplinar")
     audience=draft.get("publico","público definido no briefing")
     tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
-    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density)
-    gemini_final_prompt=build_gemini_final_art_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density)
+    prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density,selected_ratio)
+    gemini_final_prompt=build_gemini_final_art_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density,selected_ratio,typography_choice)
     generation_mode=st.radio("Forma de gerar a imagem",["Gemini Plus manual — usa sua assinatura","OpenRouter — geração direta pela API"],index=0,horizontal=True,key="studio_generation_mode")
     if generation_mode=="OpenRouter — geração direta pela API":
         st.warning("A geração direta usa saldo/créditos do OpenRouter e pode cobrar por imagem. Não é coberta pela assinatura Gemini Plus. Só será feita ao clicar em “Gerar imagem agora”.")
@@ -1673,8 +1701,8 @@ with tabs[2]:
                 reference_mime=(image_reference.type if image_reference else "image/png")
                 try:
                     with st.spinner("Gerando imagem profissional com OpenRouter…"):
-                        generated=generate_openrouter_image(prompt,chosen_model,model_metadata,reference_bytes,reference_mime)
-                        final_art=compose_uploaded_art(generated["image_bytes"],title,body,chosen_palette,signature,area,slide_idx+1,len(slides))
+                        generated=generate_openrouter_image(prompt,chosen_model,model_metadata,reference_bytes,reference_mime,selected_ratio)
+                        final_art=compose_uploaded_art(generated["image_bytes"],title,body,chosen_palette,signature,area,slide_idx+1,len(slides),typography_choice,selected_height)
                     st.session_state["openrouter_image_final"]=final_art.getvalue()
                     st.session_state["openrouter_image_meta"]=generated
                     st.session_state["openrouter_image_name"]=f"advflow_openrouter_slide_{slide_idx+1:02d}.png"
@@ -1715,7 +1743,7 @@ with tabs[2]:
     with st.expander("Alternativa sem IA"):
         st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada por IA.")
         if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
-            buf=make_art(title,body,chosen_palette,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"))
+            buf=make_art(title,body,chosen_palette,signature,area,"Editorial premium",slide_idx+1,len(slides),draft.get("etapa_funil","Descoberta"),typography=typography_choice,output_height=selected_height)
             st.image(buf,use_container_width=True)
             st.download_button("Baixar arte local PNG",buf.getvalue(),"advflow_arte_local.png","image/png",key="download_local_studio_art")
 
