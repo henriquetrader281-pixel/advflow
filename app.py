@@ -1807,25 +1807,25 @@ with tabs[1]:
                     with st.spinner("Gerando imagem profissional com OpenRouter…"):
                         generated=generate_openrouter_image(prompt,chosen_model,model_metadata,reference_bytes,reference_mime,selected_ratio)
                         final_art=compose_uploaded_art(generated["image_bytes"],title,body,selected_palette_colors,signature,area,slide_idx+1,len(slides),typography_choice,selected_height)
-                    st.session_state["openrouter_image_final"]=final_art.getvalue()
-                    st.session_state["openrouter_image_meta"]=generated
-                    st.session_state["openrouter_image_name"]=f"advflow_openrouter_slide_{slide_idx+1:02d}.png"
+                    st.session_state[f"openrouter_image_final_{slide_idx}"]=final_art.getvalue()
+                    st.session_state[f"openrouter_image_meta_{slide_idx}"]=generated
+                    st.session_state[f"openrouter_image_name_{slide_idx}"]=f"advflow_openrouter_slide_{slide_idx+1:02d}.png"
                     st.success("Imagem gerada e identidade visual aplicada.")
                 except Exception as exc:
                     st.error("Não foi possível gerar a imagem: "+str(exc))
-        if st.session_state.get("openrouter_image_final"):
-            meta=st.session_state.get("openrouter_image_meta",{})
-            st.image(st.session_state["openrouter_image_final"],use_container_width=True,caption="Arte gerada via OpenRouter e finalizada no AdvFlow")
+        if st.session_state.get(f"openrouter_image_final_{slide_idx}"):
+            meta=st.session_state.get(f"openrouter_image_meta_{slide_idx}",{})
+            st.image(st.session_state[f"openrouter_image_final_{slide_idx}"],use_container_width=True,caption="Arte gerada via OpenRouter e finalizada no AdvFlow")
             m1,m2,m3=st.columns(3)
             m1.caption("Modelo: "+str(meta.get("model","—")))
             m2.caption("Proporção enviada: "+str(meta.get("ratio") or "controlada pelo prompt/modelo"))
             cost=meta.get("cost")
             m3.caption("Custo informado pela API: "+(f"US$ {float(cost):.4f}" if isinstance(cost,(float,int)) else "não informado"))
-            st.download_button("Baixar arte final PNG",st.session_state["openrouter_image_final"],st.session_state.get("openrouter_image_name","advflow_openrouter.png"),"image/png",key="download_openrouter_image_final")
+            st.download_button("Baixar arte final PNG",st.session_state[f"openrouter_image_final_{slide_idx}"],st.session_state.get(f"openrouter_image_name_{slide_idx}",f"advflow_openrouter_slide_{slide_idx+1:02d}.png"),"image/png",key=f"download_openrouter_image_final_{slide_idx}")
     else:
         st.markdown("#### Gemini Plus: gerar o fundo e aplicar texto nítido no AdvFlow")
         st.caption("Para evitar letras distorcidas, a IA cria somente a imagem de fundo. Depois, o AdvFlow compõe o título e o texto usando a fonte selecionada, preservando a grafia exata.")
-        st.text_area("Prompt do fundo — sem texto",value=prompt,height=380,key="gemini_background_prompt")
+        st.text_area("Prompt do fundo — sem texto",value=prompt,height=380,key=f"gemini_background_prompt_{slide_idx}")
         st.components.v1.html(
             f"""<div style="font-family:sans-serif;padding:2px 0;">
             <button id="copy-gemini-background-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">Copiar prompt do fundo</button>
@@ -1841,7 +1841,7 @@ with tabs[1]:
             </script></div>""",
             height=52,
         )
-        st.download_button("Baixar prompt do fundo (.txt)",prompt.encode("utf-8"),"advflow_prompt_fundo_sem_texto.txt","text/plain",key="download_gemini_background_prompt")
+        st.download_button("Baixar prompt do fundo (.txt)",prompt.encode("utf-8"),"advflow_prompt_fundo_sem_texto.txt","text/plain",key=f"download_gemini_background_prompt_{slide_idx}")
         st.link_button("Abrir Gemini", "https://gemini.google.com/", type="primary")
         uploaded_gemini_background=st.file_uploader(
             "Depois de gerar no Gemini, envie a imagem de fundo sem texto",
