@@ -14,7 +14,7 @@ W = 1080
 PHI = 0.618
 FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
 FONT_CACHE_DIR = os.path.join(tempfile.gettempdir(), "advflow-font-cache")
-DEFAULT_TYPOGRAPHY = "Clássico imponente — Playfair Display + Montserrat"
+DEFAULT_TYPOGRAPHY = "Moderno premium — Montserrat + Inter"
 
 TYPOGRAPHY_PAIRS = {
     "Clássico imponente — Playfair Display + Montserrat": {
@@ -32,6 +32,10 @@ TYPOGRAPHY_PAIRS = {
     "Moderno limpo — Playfair Display + Open Sans": {
         "title": "Playfair Display", "body": "Open Sans",
         "description": "Contraste entre título clássico e corpo funcional."
+    },
+    "Moderno premium — Montserrat + Inter": {
+        "title": "Montserrat", "body": "Inter",
+        "description": "Hierarquia contemporânea, títulos fortes e corpo de leitura nítida."
     },
 }
 
@@ -77,6 +81,9 @@ def _system_fallbacks(role):
         paths.extend([
             "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
             "C:/Windows/Fonts/georgiab.ttf",
             "C:/Windows/Fonts/arialbd.ttf",
         ])
@@ -84,6 +91,8 @@ def _system_fallbacks(role):
         paths.extend([
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
             "C:/Windows/Fonts/arial.ttf",
         ])
     return paths
@@ -196,19 +205,20 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         first_sentence = re.split(r"(?<=[.!?])\s+", body, maxsplit=1)[0].strip()
         title = first_sentence if first_sentence and len(first_sentence) <= 95 else "O que isso significa na prática?"
     kicker = str(slide.get("kicker") or "CONTEÚDO INFORMATIVO").upper()[:72]
-    muted = tuple(int(a * .72 + b * .28) for a,b in zip(ImageColor.getrgb(ink), ImageColor.getrgb(bgc)))
+    # Keep typography dark enough for clear contrast after Instagram compression.
+    muted = tuple(int(a * .92 + b * .08) for a,b in zip(ImageColor.getrgb(ink), ImageColor.getrgb(bgc)))
     disclaimer = "Informação geral. Avalie o contexto e as fontes aplicáveis."
 
     if bg is not None:
         # Square artwork needs a shorter photo zone to preserve text space.
-        photo_fraction = .50 if height <= W else PHI
+        photo_fraction = .46 if height <= W else .52
         photo_h = int(height * photo_fraction)
         target_x = {"Esquerda":.382, "Centro":.5, "Direita":.618}.get(side,.5)
         image.paste(cover_crop(bg.convert("RGB"), W, photo_h, focus[0], focus[1], target_x, .382), (0,0))
         top, bottom, x0, x1 = photo_h - 60, height - 54, 108, W - 108
         draw.rounded_rectangle((54,top,W-54,bottom), radius=32, fill=bgc, outline=accent, width=3)
         y = top + 42
-        draw.text((x0,y),kicker,font=font(22, typography=typography, role="body"),fill=accent); y += 42
+        draw.text((x0,y),kicker,font=font(22, True, typography, "title"),fill=ink); y += 42
         draw.rectangle((x0,y,x0+140,y+6),fill=accent); y += 30
         max_y = bottom - 130
         title_font, title_lines, title_step = fit(draw,title,x1-x0,(max_y-y)*.63,[78,72,66,60,54],True,1.15,3,typography)
@@ -224,7 +234,7 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         x0, x1 = 88, W-88
         draw.rectangle((0,0,W,14),fill=accent)
         y = 105
-        draw.text((x0,y),kicker,font=font(22, typography=typography, role="body"),fill=accent); y += 48
+        draw.text((x0,y),kicker,font=font(22, True, typography, "title"),fill=ink); y += 48
         draw.rectangle((x0,y,x0+125,y+6),fill=accent); y += 38
         title_font,title_lines,title_step=fit(draw,title,x1-x0,height*.30,[72,66,60,56,50],True,1.16,3,typography)
         for line in title_lines:
