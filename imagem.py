@@ -219,16 +219,11 @@ def render(slide, index, total, height, palette, office="", oab="", bg=None, log
         for line in body_lines:
             draw.text((x0,y),line,font=body_font,fill=muted); y += body_step
         draw.rectangle((x0,bottom-120,x1,bottom-118),fill=accent)
-        if total > 1:
-            draw.text((x1-100,bottom-98),f"{index+1:02d}/{total:02d}",font=font(24,True, typography=typography, role="title"),fill=accent)
         draw.text((x0,bottom-55),disclaimer,font=font(18, typography=typography, role="body"),fill=muted)
     else:
         x0, x1 = 88, W-88
         draw.rectangle((0,0,W,14),fill=accent)
         y = 105
-        if total > 1:
-            draw.text((x0,y),f"{index+1:02d}",font=font(90,True, typography=typography, role="title"),fill=accent)
-            y += 135
         draw.text((x0,y),kicker,font=font(22, typography=typography, role="body"),fill=accent); y += 48
         draw.rectangle((x0,y,x0+125,y+6),fill=accent); y += 38
         title_font,title_lines,title_step=fit(draw,title,x1-x0,height*.30,[72,66,60,56,50],True,1.16,3,typography)
