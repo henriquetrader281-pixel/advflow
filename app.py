@@ -41,6 +41,123 @@ with db() as c:
             if col_name not in existing:
                 c.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}")
 
+def persistent_auth_enabled():
+    """True when account records are stored in Supabase instead of local SQLite."""
+    return bool(
+        secret("SUPABASE_URL").strip()
+        and (secret("SUPABASE_SECRET_KEY").strip() or secret("SUPABASE_SERVICE_ROLE_KEY").strip())
+    )
+
+def supabase_auth_key():
+    return secret("SUPABASE_SECRET_KEY").strip() or secret("SUPABASE_SERVICE_ROLE_KEY").strip()
+
+def supabase_auth_request(method, params=None, payload=None, prefer=None):
+    """Access only the auth table through Supabase REST from the server."""
+    base_url = secret("SUPABASE_URL").strip().rstrip("/")
+    key = supabase_auth_key()
+    if not base_url or not key:
+        raise RuntimeError("Configure SUPABASE_URL and SUPABASE_SECRET_KEY in hosting Secrets.")
+    headers = {
+        "apikey": key,
+        "Authorization": "Bearer " + key,
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if prefer:
+        headers["Prefer"] = prefer
+    try:
+        response = requests.request(
+            method.upper(), base_url + "/rest/v1/advflow_users",
+            headers=headers, params=params or {}, json=payload, timeout=15
+        )
+    except requests.RequestException as exc:
+        raise RuntimeError("Não foi possível alcançar o banco persistente de login (" + exc.__class__.__name__ + ").") from exc
+    if not response.ok:
+        try:
+            data = response.json()
+            detail = str(data.get("message") or data.get("hint") or data.get("details") or data.get("code") or data)[:350] if isinstance(data, dict) else str(data)[:350]
+        except Exception:
+            detail = (response.text or "sem detalhes")[:350]
+        if response.status_code == 404:
+            raise RuntimeError("A tabela public.advflow_users não foi encontrada. Execute supabase/schema.sql no SQL Editor do Supabase.")
+        if response.status_code in (401, 403):
+            raise RuntimeError("Supabase recusou a chave ou a permissão do banco. Confira SUPABASE_URL e a chave secreta nos Secrets.")
+        raise RuntimeError(f"Banco persistente de login respondeu HTTP {response.status_code}: {detail}")
+    if response.status_code == 204 or not response.content:
+        return []
+    data = response.json()
+    return data if isinstance(data, list) else [data]
+
+def local_auth_users_list():
+    with db() as c:
+        rows = c.execute(
+            "SELECT username,password_salt,password_hash,role,active,must_change_password,failed_attempts,locked_until,created_at FROM users ORDER BY username"
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+def persistent_auth_users_list(migrate_local_once=True):
+    """Load persistent users; if empty, migrate existing local password hashes one time."""
+    rows = supabase_auth_request("GET", params={"select": "*", "order": "username.asc"})
+    if not rows and migrate_local_once:
+        local_rows = local_auth_users_list()
+        if local_rows:
+            for row in local_rows:
+                row["active"] = bool(row.get("active", 1))
+                row["must_change_password"] = bool(row.get("must_change_password", 0))
+                supabase_auth_request("POST", payload=row, prefer="return=minimal")
+            rows = supabase_auth_request("GET", params={"select": "*", "order": "username.asc"})
+    return rows
+
+def auth_users_list():
+    return persistent_auth_users_list() if persistent_auth_enabled() else local_auth_users_list()
+
+def auth_user_get(username):
+    clean = (username or "").strip().lower()
+    if persistent_auth_enabled():
+        rows = supabase_auth_request("GET", params={"select": "*", "username": "eq." + clean, "limit": "1"})
+        return rows[0] if rows else None
+    with db() as c:
+        row = c.execute("SELECT * FROM users WHERE username=? COLLATE NOCASE", (clean,)).fetchone()
+    return dict(row) if row else None
+
+def auth_user_insert(username, salt, digest, role="user", active=True, must_change_password=False, created_at=None):
+    record = {
+        "username": username, "password_salt": salt, "password_hash": digest,
+        "role": role, "active": bool(active), "must_change_password": bool(must_change_password),
+        "failed_attempts": 0, "locked_until": None,
+        "created_at": created_at or datetime.now().isoformat(timespec="seconds"),
+    }
+    if persistent_auth_enabled():
+        supabase_auth_request("POST", payload=record, prefer="return=minimal")
+        return record
+    with db() as c:
+        c.execute(
+            "INSERT INTO users(username,password_salt,password_hash,role,active,must_change_password,failed_attempts,locked_until,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (record["username"],record["password_salt"],record["password_hash"],record["role"],int(record["active"]),int(record["must_change_password"]),0,None,record["created_at"])
+        )
+    return record
+
+def auth_user_update(username, fields):
+    clean = (username or "").strip().lower()
+    if persistent_auth_enabled():
+        return supabase_auth_request("PATCH", params={"username": "eq." + clean}, payload=fields, prefer="return=representation")
+    allowed = {"password_salt","password_hash","role","active","must_change_password","failed_attempts","locked_until"}
+    updates = {k:v for k,v in fields.items() if k in allowed}
+    if not updates:
+        return []
+    clause = ", ".join(f"{key}=?" for key in updates)
+    values = [int(v) if key in ("active","must_change_password") and isinstance(v,bool) else v for key,v in updates.items()]
+    with db() as c:
+        c.execute(f"UPDATE users SET {clause} WHERE username=?", (*values,clean))
+    return []
+
+def persistent_auth_warning():
+    if not persistent_auth_enabled():
+        st.warning(
+            "O login ainda usa SQLite local e pode ser perdido quando a hospedagem reinicia ou publica uma nova versão. "
+            "Configure SUPABASE_URL e SUPABASE_SECRET_KEY e crie a tabela conforme supabase/schema.sql para manter as contas."
+        )
+
 def password_record(password, salt=None):
     salt = salt or secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), bytes.fromhex(salt), 310000).hex()
@@ -56,21 +173,34 @@ def valid_username(username):
 def auth_gate():
     st.title("AdvFlow | Acesso seguro")
     st.caption("Contas individuais e senhas protegidas por hash.")
-    with db() as c:
-        account_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    username = st.session_state.get("auth_user")
-    account = None
-    if username:
-        with db() as c:
-            account = c.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
-        if account is None:
+    remote_store = persistent_auth_enabled()
+    try:
+        if remote_store:
+            accounts = persistent_auth_users_list()
+            account_count = len(accounts)
+        else:
+            with db() as c:
+                account_count = c.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        username = st.session_state.get("auth_user")
+        account = auth_user_get(username) if username else None
+        if username and (account is None or not bool(account.get("active", 0))):
             st.session_state.pop("auth_user", None)
             username = None
+            account = None
+    except Exception as exc:
+        st.error("Não foi possível consultar o banco de contas. O login foi interrompido para evitar criar uma conta local divergente.")
+        st.error(str(exc))
+        st.info("Confira SUPABASE_URL e SUPABASE_SECRET_KEY e execute supabase/schema.sql no SQL Editor do Supabase.")
+        st.stop()
+
+    if not remote_store:
+        persistent_auth_warning()
+
     if account_count == 0:
-        st.info("Primeiro acesso: configure uma chave de instalação privada em Streamlit Secrets e use-a somente para criar o primeiro administrador.")
+        st.info("Primeiro acesso: configure uma chave privada de instalação e use-a somente para criar o primeiro administrador.")
         setup_key_expected=secret("INITIAL_SETUP_KEY")
         if not setup_key_expected:
-            st.error("Configuração pendente: adicione INITIAL_SETUP_KEY em Settings → Secrets antes de liberar o cadastro inicial. Gere uma chave longa e aleatória e não use o valor de exemplo.")
+            st.error("Configuração pendente: adicione INITIAL_SETUP_KEY em Streamlit Secrets antes de liberar o cadastro inicial. Gere uma chave longa e aleatória e não use o valor de exemplo.")
             st.stop()
         with st.form("initial_admin_setup"):
             setup_key = st.text_input("Chave de instalação", type="password")
@@ -90,14 +220,17 @@ def auth_gate():
                 st.error("As senhas não conferem.")
             else:
                 salt, digest = password_record(pw1)
-                with db() as c:
-                    c.execute("INSERT INTO users(username,password_salt,password_hash,role,active,created_at) VALUES(?,?,?,?,?,?)",
-                              (clean_user,salt,digest,"admin",1,datetime.now().isoformat(timespec="seconds")))
+                try:
+                    auth_user_insert(clean_user,salt,digest,"admin",True,False,datetime.now().isoformat(timespec="seconds"))
                     for table_name in ("pieces","metrics","calendar"):
-                        c.execute(f"UPDATE {table_name} SET user_id=? WHERE user_id='legacy'",(clean_user,))
-                st.session_state["auth_user"] = clean_user
-                st.rerun()
+                        with db() as c:
+                            c.execute(f"UPDATE {table_name} SET user_id=? WHERE user_id='legacy'",(clean_user,))
+                    st.session_state["auth_user"] = clean_user
+                    st.rerun()
+                except Exception as exc:
+                    st.error("Não foi possível criar a conta de administrador: " + str(exc))
         st.stop()
+
     if account is None:
         with st.form("login_form"):
             login_user = st.text_input("Usuário")
@@ -105,40 +238,52 @@ def auth_gate():
             login_submit = st.form_submit_button("Entrar", type="primary")
         if login_submit:
             clean_user = (login_user or "").strip().lower()
-            with db() as c:
-                record = c.execute("SELECT * FROM users WHERE username=? COLLATE NOCASE", (clean_user,)).fetchone()
+            try:
+                record = auth_user_get(clean_user)
                 now = datetime.now()
-                if record and record["active"]:
-                    locked_until = record["locked_until"]
-                    if locked_until and datetime.fromisoformat(locked_until) > now:
-                        st.error("Conta temporariamente bloqueada após falhas de autenticação. Tente mais tarde ou solicite redefinição ao administrador.")
-                        st.stop()
+                if record and bool(record.get("active", 0)):
+                    locked_until = record.get("locked_until")
+                    if locked_until:
+                        lock_dt = datetime.fromisoformat(str(locked_until).replace("Z", "+00:00"))
+                        clock = datetime.now(lock_dt.tzinfo) if lock_dt.tzinfo else now
+                        if lock_dt > clock:
+                            st.error("Conta temporariamente bloqueada após falhas de autenticação. Aguarde o fim do bloqueio de 15 minutos.")
+                            st.stop()
                     if password_matches(login_password,record["password_salt"],record["password_hash"]):
-                        c.execute("UPDATE users SET failed_attempts=0,locked_until=NULL WHERE username=?",(clean_user,))
+                        auth_user_update(clean_user, {"failed_attempts":0,"locked_until":None})
                         st.session_state["auth_user"] = record["username"]
                         st.rerun()
-                    failures = int(record["failed_attempts"] or 0) + 1
+                    failures = int(record.get("failed_attempts") or 0) + 1
                     lock_time = (now + timedelta(minutes=15)).isoformat(timespec="seconds") if failures >= 5 else None
-                    c.execute("UPDATE users SET failed_attempts=?,locked_until=? WHERE username=?",(failures,lock_time,clean_user))
-            st.error("Usuário ou senha inválidos. Cinco tentativas incorretas bloqueiam o acesso por 15 minutos.")
+                    auth_user_update(clean_user, {"failed_attempts":failures,"locked_until":lock_time})
+                st.error("Usuário ou senha inválidos. Cinco tentativas incorretas bloqueiam o acesso por 15 minutos.")
+            except Exception as exc:
+                st.error("Não foi possível validar o login no banco de contas: " + str(exc))
         st.caption("Esqueceu a senha? Solicite ao administrador uma redefinição. Esta versão não envia e-mails de recuperação.")
         st.stop()
-    if account["must_change_password"]:
+
+    if bool(account.get("must_change_password",0)):
         st.warning("Por segurança, altere a senha temporária para continuar.")
         with st.form("required_password_change"):
             pw1 = st.text_input("Nova senha",type="password")
             pw2 = st.text_input("Confirme a nova senha",type="password")
             submit_change = st.form_submit_button("Salvar nova senha",type="primary")
         if submit_change:
-            if len(pw1) < 12: st.error("A senha deve ter pelo menos 12 caracteres.")
-            elif pw1 != pw2: st.error("As senhas não conferem.")
+            if len(pw1) < 12:
+                st.error("A senha deve ter pelo menos 12 caracteres.")
+            elif pw1 != pw2:
+                st.error("As senhas não conferem.")
             else:
                 salt,digest=password_record(pw1)
-                with db() as c:
-                    c.execute("UPDATE users SET password_salt=?,password_hash=?,must_change_password=0,failed_attempts=0,locked_until=NULL WHERE username=?",
-                              (salt,digest,account["username"]))
-                st.success("Senha atualizada.")
-                st.rerun()
+                try:
+                    auth_user_update(account["username"], {
+                        "password_salt":salt, "password_hash":digest,
+                        "must_change_password":False, "failed_attempts":0, "locked_until":None,
+                    })
+                    st.success("Senha atualizada.")
+                    st.rerun()
+                except Exception as exc:
+                    st.error("Não foi possível salvar a nova senha no banco persistente: " + str(exc))
         st.stop()
     return dict(account)
 
@@ -1811,12 +1956,13 @@ if current_user["role"] == "admin":
                 temporary_password=secrets.token_urlsafe(12)
                 salt,digest=password_record(temporary_password)
                 try:
-                    with db() as c:
-                        c.execute("INSERT INTO users(username,password_salt,password_hash,role,active,must_change_password,created_at) VALUES(?,?,?,?,?,?,?)",
-                                  (clean_new,salt,digest,"admin" if role_admin else "user",1,1,datetime.now().isoformat(timespec="seconds")))
+                    auth_user_insert(clean_new,salt,digest,"admin" if role_admin else "user",True,True,datetime.now().isoformat(timespec="seconds"))
                     st.session_state["temporary_credentials"]={"username":clean_new,"password":temporary_password,"message":"Conta criada. Copie a senha temporária agora; ela será ocultada ao sair desta tela."}
-                except sqlite3.IntegrityError:
-                    st.error("Esse nome de usuário já existe.")
+                except Exception as exc:
+                    if "409" in str(exc) or "duplicate key" in str(exc).lower() or "unique constraint" in str(exc).lower():
+                        st.error("Esse nome de usuário já existe.")
+                    else:
+                        st.error("Não foi possível criar a conta: " + str(exc))
         if st.session_state.get("temporary_credentials"):
             creds=st.session_state["temporary_credentials"]
             st.warning(creds["message"])
@@ -1825,8 +1971,12 @@ if current_user["role"] == "admin":
                 st.session_state.pop("temporary_credentials",None)
                 st.rerun()
         st.divider()
-        with db() as c:
-            account_rows=[dict(r) for r in c.execute("SELECT username,role,active,must_change_password,failed_attempts,locked_until,created_at FROM users ORDER BY username")]
+        try:
+            account_rows=auth_users_list()
+            account_rows.sort(key=lambda row: str(row.get("username","")).lower())
+        except Exception as exc:
+            account_rows=[]
+            st.error("Não foi possível carregar as contas: " + str(exc))
         if account_rows:
             view=pd.DataFrame(account_rows)
             view["status"]=view["active"].map({1:"Ativa",0:"Desativada"})
@@ -1839,10 +1989,15 @@ if current_user["role"] == "admin":
             reset_clicked=b1.button("Redefinir senha",disabled=(selected_user==current_user["username"]),key="reset_user_password")
             if reset_clicked:
                 temp=secrets.token_urlsafe(12); salt,digest=password_record(temp)
-                with db() as c:
-                    c.execute("UPDATE users SET password_salt=?,password_hash=?,must_change_password=1,failed_attempts=0,locked_until=NULL WHERE username=?",(salt,digest,selected_user))
-                st.session_state["temporary_credentials"]={"username":selected_user,"password":temp,"message":"Senha redefinida. Entregue por canal seguro; o usuário deverá trocá-la."}
-                st.rerun()
+                try:
+                    auth_user_update(selected_user, {
+                        "password_salt":salt, "password_hash":digest, "must_change_password":True,
+                        "failed_attempts":0, "locked_until":None,
+                    })
+                    st.session_state["temporary_credentials"]={"username":selected_user,"password":temp,"message":"Senha redefinida. Entregue por canal seguro; o usuário deverá trocá-la."}
+                    st.rerun()
+                except Exception as exc:
+                    st.error("Não foi possível salvar a redefinição no banco de contas: " + str(exc))
             if selected_user==current_user["username"]:
                 st.caption("Para sua própria conta, use a alteração de senha no primeiro acesso ou peça a outro administrador para redefini-la.")
             if target["username"]==current_user["username"]:
@@ -1854,11 +2009,17 @@ if current_user["role"] == "admin":
                         if target["role"]=="admin" and sum(1 for r in account_rows if r["role"]=="admin" and r["active"])<=1:
                             st.error("Não é possível desativar o último administrador.")
                         else:
-                            with db() as c:c.execute("UPDATE users SET active=0 WHERE username=?",(selected_user,))
-                            st.success("Conta desativada."); st.rerun()
+                            try:
+                                auth_user_update(selected_user, {"active":False})
+                                st.success("Conta desativada."); st.rerun()
+                            except Exception as exc:
+                                st.error("Não foi possível desativar a conta: " + str(exc))
                     b3.button("Reativar conta",disabled=True,key="reactivate_disabled")
                 else:
                     b2.button("Desativar conta",disabled=True,key="disable_disabled")
                     if b3.button("Reativar conta",key="enable_user"):
-                        with db() as c:c.execute("UPDATE users SET active=1,failed_attempts=0,locked_until=NULL WHERE username=?",(selected_user,))
-                        st.success("Conta reativada."); st.rerun()
+                        try:
+                            auth_user_update(selected_user, {"active":True,"failed_attempts":0,"locked_until":None})
+                            st.success("Conta reativada."); st.rerun()
+                        except Exception as exc:
+                            st.error("Não foi possível reativar a conta: " + str(exc))
