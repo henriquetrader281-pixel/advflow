@@ -732,7 +732,7 @@ def generate_professional_copy(subject, audience, fmt, area, objective, tone, de
     raise RuntimeError("Nenhuma integração de IA conseguiu gerar a copy. " + " | ".join(errors))
 
 
-DEFAULT_TYPOGRAPHY = "Clássico imponente — Playfair Display + Montserrat"
+DEFAULT_TYPOGRAPHY = "Moderno premium — Montserrat + Inter"
 TYPOGRAPHY_SPECS = {
     "Clássico imponente — Playfair Display + Montserrat": {
         "title": "Playfair Display", "body": "Montserrat",
@@ -750,6 +750,10 @@ TYPOGRAPHY_SPECS = {
         "title": "Playfair Display", "body": "Open Sans",
         "description": "Equilíbrio entre personalidade no título e leitura funcional."
     },
+    "Moderno premium — Montserrat + Inter": {
+        "title": "Montserrat", "body": "Inter",
+        "description": "Títulos fortes, modernos e corpo limpo, com contraste e leitura profissional."
+    },
 }
 
 def typography_guidance(typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
@@ -762,7 +766,7 @@ def typography_guidance(typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
         f"e texto auxiliar/rodapé entre 16–19 px (aproximadamente 12–14 pt). Use negrito apenas para hierarquia, no máximo três níveis tipográficos, "
         f"largura de linha confortável, entrelinha generosa, alto contraste e margens seguras. "
         f"Se o texto exceder a capacidade, simplifique a copy sem alterar a regra jurídica ou peça revisão editorial; "
-        f"não reduza o corpo abaixo de 22 px, não aperte o espaçamento e não corte palavras. "
+        f"não reduza o corpo abaixo de 24 px, não aperte o espaçamento e não corte palavras. "
         f"Deixe espaço negativo; capa com título curto e dominante; slides internos com uma ideia principal e poucas linhas. "
         f"Sem emojis, ícones decorativos, texto fluorescente, caixa alta em parágrafos ou excesso de dourado."
     )
@@ -1348,13 +1352,13 @@ def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="
     photo=ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes))).convert("RGB")
     if photo.width < 200 or photo.height < 200:
         raise ValueError("A imagem é pequena demais para uma arte profissional. Envie uma imagem com pelo menos 200 × 200 pixels.")
-    bg,ink,accent=PALETTES[palette]
+    bg,ink,accent=palette_values(palette)
     # Cover uses the photo-led editorial composition; following slides use a clean typography-led layout.
     focus=imagem.autofoco(photo) or (.5,.4)
     rendered=imagem.render(
         {"titulo":str(title).strip(),"texto":str(body).strip(),"kicker":str(area or "Conteúdo informativo")},
         max(0,int(slide_index)-1),max(1,int(total_slides)),int(output_height),
-        (bg,ink,accent),signature,"",photo if int(slide_index)==1 else None,
+        (bg,ink,accent),signature,"",photo,
         None,focus,"Centro",typography
     )
     out=io.BytesIO();rendered.save(out,format="PNG",optimize=True);out.seek(0);return out
@@ -1405,9 +1409,12 @@ with tabs[1]:
         settings_a,settings_b=st.columns(2)
         visual_type=settings_a.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],key="studio_visual_type")
         visual_style=settings_b.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],key="studio_visual_style")
+        if not st.session_state.get("_modern_typography_default_applied"):
+            st.session_state["studio_typography"]=DEFAULT_TYPOGRAPHY
+            st.session_state["_modern_typography_default_applied"]=True
         settings_c,settings_d=st.columns(2)
         visual_density=settings_c.selectbox("Densidade visual",["Enxuta","Equilibrada","Rica em detalhes"],index=1,key="studio_visual_density")
-        typography_choice=settings_d.selectbox("Combinação tipográfica",list(TYPOGRAPHY_SPECS),key="studio_typography")
+        typography_choice=settings_d.selectbox("Combinação tipográfica",list(TYPOGRAPHY_SPECS),index=list(TYPOGRAPHY_SPECS).index(DEFAULT_TYPOGRAPHY),key="studio_typography")
         st.caption(TYPOGRAPHY_SPECS[typography_choice]["description"]+" Se a fonte não puder ser carregada no servidor, será usada uma alternativa compatível.")
         ratio_labels={
             "4:5":"Feed vertical — 4:5 (1080 × 1350)",
@@ -1553,7 +1560,8 @@ with tabs[1]:
                         office=office, oab=oab,
                         palette_name=chosen_palette,
                         typography_name=typography_choice,
-                        aspect_ratio=selected_ratio
+                        aspect_ratio=selected_ratio,
+                        visual_type=visual_type, visual_style=visual_style, visual_density=visual_density
                     )
                     st.components.v1.html(
                         f"""<div style="font-family:sans-serif;padding:2px 0;">
@@ -1655,9 +1663,12 @@ with tabs[1]:
             d, fmt=fmt if "fmt" in locals() else str(d.get("formato", "Carrossel")),
             audience=str(d.get("publico", audience if "audience" in locals() else "público geral")),
             office=office, oab=oab,
-            palette_name=st.session_state.get("studio_palette", "Identidade do escritório"),
-            typography_name=st.session_state.get("studio_typography", DEFAULT_TYPOGRAPHY),
-            aspect_ratio=st.session_state.get("studio_aspect_ratio", "4:5")
+            palette_name=chosen_palette,
+            visual_style=visual_style,
+            visual_type=visual_type,
+            visual_density=visual_density,
+            typography_name=typography_choice,
+            aspect_ratio=selected_ratio
         )
         st.text_area("Briefing completo — copy textual + copy de imagem/vídeo", value=gemini_brief, height=420, key="gemini_full_piece_brief")
         st.components.v1.html(
@@ -1701,7 +1712,6 @@ with tabs[1]:
     audience=draft.get("publico","público definido no briefing")
     tone=draft.get("tom_de_voz","sóbrio, didático e profissional")
     prompt=build_gemini_plus_prompt(title,body,area,audience,tone,visual_style,chosen_palette,selected_palette_colors,visual_direction,visual_type,visual_density,selected_ratio)
-    gemini_final_prompt=build_gemini_final_art_prompt(title,body,area,audience,tone,visual_style,chosen_palette,PALETTES[chosen_palette],visual_direction,visual_type,visual_density,selected_ratio,typography_choice)
     generation_mode=st.radio("Forma de gerar a imagem",["Gemini Plus manual — usa sua assinatura","OpenRouter — geração direta pela API"],index=0,horizontal=True,key="studio_generation_mode")
     if generation_mode=="OpenRouter — geração direta pela API":
         st.warning("A geração direta usa saldo/créditos do OpenRouter e pode cobrar por imagem. Não é coberta pela assinatura Gemini Plus. Só será feita ao clicar em “Gerar imagem agora”.")
@@ -1762,27 +1772,53 @@ with tabs[1]:
             m3.caption("Custo informado pela API: "+(f"US$ {float(cost):.4f}" if isinstance(cost,(float,int)) else "não informado"))
             st.download_button("Baixar arte final PNG",st.session_state["openrouter_image_final"],st.session_state.get("openrouter_image_name","advflow_openrouter.png"),"image/png",key="download_openrouter_image_final")
     else:
-        st.markdown("#### Gerar a arte final no Gemini Plus")
-        st.caption("Este prompt pede a imagem já pronta para publicar, com título e copy em português integrados à própria arte. Não é um prompt para gerar apenas o fundo.")
-        st.text_area("Prompt para a imagem completa — texto + arte",value=gemini_final_prompt,height=430,key="gemini_plus_prompt")
+        st.markdown("#### Gemini Plus: gerar o fundo e aplicar texto nítido no AdvFlow")
+        st.caption("Para evitar letras distorcidas, a IA cria somente a imagem de fundo. Depois, o AdvFlow compõe o título e o texto usando a fonte selecionada, preservando a grafia exata.")
+        st.text_area("Prompt do fundo — sem texto",value=prompt,height=380,key="gemini_background_prompt")
         st.components.v1.html(
             f"""<div style="font-family:sans-serif;padding:2px 0;">
-            <button id="copy-gemini-final-art-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">Copiar prompt da arte completa</button>
-            <span id="copy-gemini-final-art-status" style="margin-left:10px;font-size:13px;"></span>
+            <button id="copy-gemini-background-prompt" style="background:#2563eb;color:white;border:0;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;">Copiar prompt do fundo</button>
+            <span id="copy-gemini-background-status" style="margin-left:10px;font-size:13px;"></span>
             <script>
-            const finalArtPrompt = {json.dumps(gemini_final_prompt, ensure_ascii=False)};
-            const btn = document.getElementById('copy-gemini-final-art-prompt');
-            const status = document.getElementById('copy-gemini-final-art-status');
-            btn.addEventListener('click', async () => {{
-              try {{ await navigator.clipboard.writeText(finalArtPrompt); status.textContent = 'Copiado! Cole no Gemini.'; }}
-              catch (e) {{ status.textContent = 'Cópia automática indisponível; selecione o prompt acima e copie.'; }}
+            const bgPromptText = {json.dumps(prompt, ensure_ascii=False)};
+            const bgBtn = document.getElementById('copy-gemini-background-prompt');
+            const bgStatus = document.getElementById('copy-gemini-background-status');
+            bgBtn.addEventListener('click', async () => {{
+              try {{ await navigator.clipboard.writeText(bgPromptText); bgStatus.textContent = 'Copiado! Cole no Gemini.'; }}
+              catch (e) {{ bgStatus.textContent = 'Selecione o texto acima e copie.'; }}
             }});
             </script></div>""",
             height=52,
         )
-        st.download_button("Baixar prompt completo (.txt)",gemini_final_prompt.encode("utf-8"),"advflow_prompt_gemini_arte_final.txt","text/plain",key="download_gemini_prompt")
+        st.download_button("Baixar prompt do fundo (.txt)",prompt.encode("utf-8"),"advflow_prompt_fundo_sem_texto.txt","text/plain",key="download_gemini_background_prompt")
         st.link_button("Abrir Gemini", "https://gemini.google.com/", type="primary")
-        st.info("No Gemini, peça uma imagem final com todos os textos já inseridos. Confira acentuação e se nenhuma palavra foi omitida antes de publicar; modelos de imagem podem cometer erros de tipografia. Não é necessário importar a imagem de volta ao AdvFlow só para inserir o mesmo texto.")
+        uploaded_gemini_background=st.file_uploader(
+            "Depois de gerar no Gemini, envie a imagem de fundo sem texto",
+            type=["png","jpg","jpeg","webp"],
+            key=f"gemini_background_image_{slide_idx}",
+            help="Salve a imagem do Gemini sem letras nem logotipos. O AdvFlow aplica o texto em uma camada tipográfica separada."
+        )
+        if uploaded_gemini_background and st.button("Aplicar tipografia e finalizar arte",type="primary",key=f"finalize_gemini_art_{slide_idx}"):
+            try:
+                with st.spinner("Aplicando tipografia nítida e finalizando a arte..."):
+                    finished=compose_uploaded_art(
+                        uploaded_gemini_background.getvalue(),title,body,selected_palette_colors,
+                        signature,area,slide_idx+1,len(slides),typography_choice,selected_height
+                    )
+                st.session_state[f"gemini_background_final_{slide_idx}"]=finished.getvalue()
+                st.session_state[f"gemini_background_final_name_{slide_idx}"]=f"advflow_gemini_slide_{slide_idx+1:02d}.png"
+                st.success("Arte finalizada: o texto foi composto pelo AdvFlow, não desenhado pela IA.")
+            except Exception as exc:
+                st.error("Não foi possível finalizar a arte: "+str(exc))
+        final_key=f"gemini_background_final_{slide_idx}"
+        if st.session_state.get(final_key):
+            st.image(st.session_state[final_key],use_container_width=True,caption="Fundo do Gemini + tipografia do AdvFlow")
+            st.download_button(
+                "Baixar arte final PNG",st.session_state[final_key],
+                st.session_state.get(f"gemini_background_final_name_{slide_idx}",f"advflow_gemini_slide_{slide_idx+1:02d}.png"),
+                "image/png",key=f"download_gemini_background_final_{slide_idx}"
+            )
+
     with st.expander("Alternativa sem IA"):
         st.caption("A arte local tem ilustração vetorial e tipografia, mas é menos rica que uma imagem editorial criada por IA.")
         if st.button("Gerar arte tipográfica local",key="make_local_studio_art"):
@@ -1934,8 +1970,8 @@ with tabs[3]:
     else:
         st.warning("Login ainda usa SQLite local. Configure SUPABASE_URL e SUPABASE_SECRET_KEY para não perder as contas após reinícios/redeploys.")
         st.markdown("Execute primeiro o arquivo [supabase/schema.sql no GitHub](https://github.com/henriquetrader281-pixel/advflow/blob/main/supabase/schema.sql) no SQL Editor do Supabase. Depois adicione a URL do projeto e a chave secreta em Streamlit Community Cloud → Settings → Secrets e reinicie o app.")
-    st.markdown("- **Gemini:** configure GEMINI_API_KEY e um modelo ativo na sua conta; padrão sugerido no código: gemini-3.8-flash.")
-    st.markdown("- **Alternativa Groq:** configure GROQ_API_KEY; o modelo padrão vem de GROQ_MODEL.")
+    st.markdown("- **Gemini:** configure GEMINI_API_KEY; o fluxo tenta modelos alternativos se o principal estiver ocupado ou indisponível.")
+    st.markdown("- **Alternativa Groq:** configure GROQ_API_KEY; o fluxo tenta GPT-OSS 120B, GPT-OSS 20B e Qwen 3.8 27B e repete sem modo JSON quando necessário.")
     st.markdown("- **OpenRouter:** configure OPENROUTER_API_KEY em Secrets. O modelo padrão é openrouter/free; você pode alterá-lo em OPENROUTER_MODEL. Modelos gratuitos têm cotas e limites próprios.")
     st.markdown("- **Chaves de API:** nunca publique chaves no GitHub; mantenha-as nos Secrets do Streamlit.")
     if st.button("Testar conexão OpenRouter",key="test_openrouter_connection"):
