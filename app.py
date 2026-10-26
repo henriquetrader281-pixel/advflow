@@ -1383,7 +1383,7 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("Agente de conteúdo")
 
-    with st.expander("Revisão OAB e conferência jurídica", expanded=False):
+    with st.expander("Revisão OAB — triagem ética", expanded=False):
         st.subheader("Triagem de publicidade jurídica")
         text_to_check=st.text_area("Cole a legenda, roteiro ou texto da arte",height=220)
         if st.button("Analisar texto"):
