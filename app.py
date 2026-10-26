@@ -922,15 +922,13 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         d.rounded_rectangle((72,y+12,280,y+19),radius=3,fill=accent_rgb)
         wrapped(body,72,y+53,font(29),900,ink_rgb,39,7)
     else:
-        d.text((72,sy(160)),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
-        y=wrapped(title,72,sy(208),font(66 if len(str(title))<42 else 56,True),910,ink_rgb,72,3)
+        y=wrapped(title,72,sy(175),font(66 if len(str(title))<42 else 56,True),910,ink_rgb,72,3)
         d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb);y+=45
         d.rounded_rectangle((54,y-12,1025,sy(1110)),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
         d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
         wrapped(body,86,y+45,font(28),855,ink_rgb,39,10)
     d.line((72,sy(1204),1008,sy(1204)),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
     d.text((72,sy(1242)),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
-    d.text((935,sy(1302)),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
     if logo_bytes:
         try:
             logo=Image.open(io.BytesIO(logo_bytes)).convert("RGBA");logo.thumbnail((150,70))
@@ -976,7 +974,7 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
     layout_ratio = "9:16" if ("reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower) else aspect_ratio
     video_mode = "REEL/VÍDEO: produzir um Reel final de 30–45 segundos, vertical 9:16 (1080×1920), com ritmo natural e narração integral. NÃO comprimir todo o roteiro em um clipe curto nem acelerar a fala. Planejar 5–7 cenas com duração indicada por cena, pausas naturais e transições discretas; manter cada cena tempo suficiente para compreender a fala e ler o texto na tela. Se a ferramenta só gerar clipes de 8–10 segundos, NÃO fingir que isso é o vídeo completo: gerar clipes separados e numerados que, juntos, cubram os 30–45 segundos, mantendo personagem, roupa, cenário, iluminação e identidade visual consistentes, e fornecer a ordem de montagem. Enquadramento obrigatório vertical 9:16, nunca horizontal 16:9; manter rosto, mãos e todos os textos dentro da área segura central, com margens de pelo menos 10% nas laterais e 12% no topo/rodapé. Não cortar cabeça, mãos, legendas ou palavras; usar pouco texto por tela, alto contraste e tamanho legível em celular. A narração deve seguir a copy fornecida sem omitir frases; se não couber, aumentar a duração ou dividir em mais clipes, nunca acelerar. Antes de concluir, verificar proporção, duração total, cortes, ritmo, sincronização entre fala e imagem e legibilidade. Se não puder gerar vídeo diretamente, entregar plano de produção cena a cena com duração, narração completa e prompts individuais prontos."
     image_size = {"4:5": "1080 × 1350 pixels", "1:1": "1080 × 1080 pixels", "9:16": "1080 × 1920 pixels"}.get(layout_ratio, "1080 × 1350 pixels")
-    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo, completo e numerado para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {layout_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
+    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo e completo para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {layout_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
     if "reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower:
         media_instructions = video_mode
     elif "legenda" in fmt_lower:
@@ -995,7 +993,7 @@ Paleta: {palette_name}
 Estilo visual: {visual_style}
 SISTEMA TIPOGRÁFICO OBRIGATÓRIO
 {typography_guidance(typography_name, layout_ratio)}
-Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo; use apenas a numeração do slide quando necessária.
+Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo. Não acrescente numeração de slides, frações como 1/3 ou marcadores de sequência.
 Público-alvo: {audience}
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
 Tom de voz: {draft.get("tom_de_voz", "sóbrio, didático e profissional")}
@@ -1057,7 +1055,7 @@ FORMATO E COMPOSIÇÃO
 - Acabamento de revista profissional: high-end corporate editorial, sophisticated, trustworthy, calm authority, cinematic yet natural lighting, precise composition and ample safe margins.
 - SISTEMA TIPOGRÁFICO: {typography_guidance(typography_name, aspect_ratio)}
 - Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
-- Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo; somente a numeração do slide pode aparecer, se necessária.
+- Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo. Não inclua numeração de slides, frações como 1/3 ou marcadores de sequência.
 
 CONTEXTO EDITORIAL
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
@@ -1195,7 +1193,7 @@ STRICT TEXT REQUIREMENTS
 COMPOSITION AND SAFETY
 - Keep all text well inside safe margins; no clipped letters, text touching the edges, or important visual content cut off.
 - Use a specific and appropriate visual metaphor or scene; do not default to puzzle pieces with legal terms, scales of justice, judge's gavel, books of law, handshake or pen signing a document unless directly relevant to this topic.
-- No office name, lawyer name, OAB number, placeholder footer, invented logo or watermark. Leave the footer clean; slide number only if explicitly present in the supplied copy.
+- No office name, lawyer name, OAB number, placeholder footer, invented logo, watermark, slide counter, fraction such as 1/3, or sequence marker. Leave the footer clean and preserve only the supplied copy.
 - Do not imply guaranteed legal outcomes, winning a case or guaranteed compensation.
 - Output only the finished image. Do not answer with a description, instructions or a blank background.
 """
