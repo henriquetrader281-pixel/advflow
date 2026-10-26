@@ -1,6 +1,6 @@
 # AdvFlow — estúdio de conteúdo jurídico
 
-Aplicação Streamlit para produção de conteúdo jurídico informativo, criação visual, métricas manuais e monitoramento de notícias jurídicas.
+Aplicação Streamlit para produção de conteúdo jurídico informativo, criação visual e monitoramento de notícias jurídicas.
 
 ## Corrigir perda de acesso e manter o login persistente
 
@@ -24,13 +24,13 @@ Quando o banco remoto estiver vazio, a aplicação tenta migrar automaticamente 
 
 Se o Supabase estiver configurado mas indisponível ou sem a tabela, o login falha de forma explícita em vez de criar silenciosamente uma conta em outro banco local.
 
-**Limite importante:** esta mudança torna persistente o cadastro/login de usuários. O conteúdo salvo e as métricas ainda usam SQLite local nesta versão e podem exigir armazenamento persistente separado.
+**Limite importante:** esta mudança torna persistente o cadastro/login de usuários. Os rascunhos salvos ainda usam SQLite local nesta versão e podem exigir armazenamento persistente separado.
 
 ## Acesso e usuários
 
 - Antes de abrir o app à internet, configure INITIAL_SETUP_KEY em Streamlit Secrets com um valor longo e aleatório privado. Essa chave protege a criação do primeiro administrador e não é a senha normal de login.
 - No primeiro acesso, insira essa chave e crie o administrador na própria tela inicial. Use uma senha forte com pelo menos 12 caracteres.
-- O administrador cria contas adicionais pela aba Usuários. Cada conta tem sua própria senha e vê apenas suas peças e métricas.
+- O administrador cria contas adicionais pela aba Usuários. Cada conta tem sua própria senha e vê apenas suas próprias peças salvas.
 - Senhas temporárias são geradas pela aplicação e precisam ser alteradas no primeiro acesso. O administrador pode redefinir ou desativar contas.
 - Cinco tentativas de senha incorreta bloqueiam o login por 15 minutos.
 - Esta versão não envia recuperação de senha por e-mail; solicite redefinição ao administrador.
@@ -50,7 +50,7 @@ Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignor
 
 ## Copy profissional e triagem ética da publicidade jurídica
 
-Dentro da aba **Agente de conteúdo**, escolha **Copy profissional** no campo “Modo de criação” para produzir legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O modo reutiliza o tema, público, formato, área do Direito, tom e contexto do formulário principal. A peça resultante continua disponível na mesma tela para edição, revisão linguística e jurídica, salvamento e uso no estúdio visual. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
+Dentro da aba **Agente de conteúdo**, escolha **Copy profissional** no campo “Modo de criação” para produzir legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O modo reutiliza o tema, público, formato, área do Direito, tom e contexto do formulário principal. A peça resultante fica na mesma tela para edição, revisão linguística, revisão ética preliminar, salvamento e criação visual. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
 
 Dentro da aba **Agente de conteúdo**, abra o expansor **Revisão OAB — triagem ética** para fazer uma triagem lexical preliminar de possíveis alertas na publicidade jurídica. Essa checagem ajuda a apontar expressões que merecem revisão, mas não certifica conformidade com as regras da OAB nem substitui a análise do profissional responsável.
 
@@ -58,15 +58,16 @@ Antes de publicar, confira o texto integral, o contexto e as regras oficiais vig
 
 ## Tipografia editorial e formatos de arte
 
-O **Estúdio visual** permite selecionar quatro pares tipográficos:
+No próprio **Agente de conteúdo**, a seção **Identidade visual e formato das artes** reúne paleta, composição, estilo, densidade visual, tipografia e proporção em um único lugar. O padrão selecionado agora é o par contemporâneo de títulos fortes e corpo limpo. Os cinco pares disponíveis são:
 - **Clássico imponente:** Playfair Display + Montserrat.
 - **Clássico editorial:** Cormorant Garamond + Inter.
 - **Contemporâneo refinado:** Cinzel + Lato.
 - **Moderno limpo:** Playfair Display + Open Sans.
+- **Moderno premium (padrão):** Montserrat + Inter.
 
-As fontes de código aberto são carregadas sob demanda pelo renderizador e guardadas no cache temporário do servidor; se o download falhar, o renderizador usa fontes de sistema compatíveis. A arte local e a finalização de imagens usam o par escolhido quando a fonte está disponível. As instruções encaminhadas ao Gemini também pedem o par selecionado e uma hierarquia de tamanhos adequada para leitura em celular.
+As fontes de código aberto são carregadas sob demanda e guardadas em cache; se o download falhar, o renderizador tenta fontes de sistema compatíveis. O AdvFlow aplica o texto com essas fontes depois que o fundo é gerado, para não depender das letras desenhadas pela IA. Isso melhora a nitidez e a fidelidade da copy, embora o fundo ainda deva ser conferido antes da publicação.
 
-Formatos selecionáveis: **4:5 (1080 × 1350)**, **1:1 (1080 × 1080)** e **9:16 (1080 × 1920)**. O corpo da copy deve priorizar leitura em tela pequena, margem segura, espaço negativo e contraste; não se deve apertar o texto ou reduzir excessivamente a fonte para fazer uma peça longa caber. A IA de imagem pode errar palavras ou acentos: revise a arte final antes de publicar.
+Formatos selecionáveis: **4:5 (1080 × 1350)**, **1:1 (1080 × 1080)** e **9:16 (1080 × 1920)**. Para reduzir a distorção, o prompt pede ao Gemini ou ao modelo de imagem um fundo de alta qualidade sem letras, números, logotipos ou pseudo-texto; depois, o AdvFlow sobrepõe o título e o corpo com tipografia real. Confira contraste, enquadramento e fidelidade do texto final antes de publicar.
 
 ## OpenRouter como provedor alternativo
 
@@ -118,22 +119,17 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 ## Funcionalidades
 
 - Agente de conteúdo com Gemini, Groq alternativo e estrutura local em caso de indisponibilidade.
-- Estúdio visual com estrutura editorial de tipo × estilo × paleta × densidade, prompt detalhado por slide e controles de composição.
-- Fluxo manual com Google AI Plus/Gemini: gera o prompt, permite importar a imagem criada no app Gemini e aplicar copy, paleta e assinatura em PNG 4:5; não exige chave de API para esse modo.
+- Criação visual dentro do Agente de conteúdo, com controles únicos de paleta, composição, estilo, densidade, tipografia e proporção; os mesmos ajustes são usados nos prompts e no renderizador.
+- Fluxo Gemini Plus: copia um prompt para gerar fundo sem texto, importa a imagem gerada e aplica título e corpo em fonte real no AdvFlow; não exige chave de API para esse modo.
 - Geração de imagens diretamente no AdvFlow pelo OpenRouter Image API, com catálogo dinâmico, modelo selecionável, imagem de referência opcional quando suportada e exibição do custo retornado pela API.
 - Arte tipográfica vetorial local como alternativa sem geração de imagem por IA.
-- Validador de métricas por usuário: metas personalizadas, limites de ação, comparação de janelas e recortes por etapa do funil e formato.
-- Indicadores de alcance, interações por alcance, salvamentos por alcance, compartilhamentos por alcance, visitas ao perfil por alcance e cliques por visita.
-- Alertas de qualidade: datas inválidas, alcance zero, temas vazios, dados parciais e possíveis registros duplicados; os dados antigos não são alterados automaticamente.
-- Configuração de metas por histórico e objetivo editorial, sem aplicar benchmarks universais ou apresentar correlação como causalidade.
-- Métricas manuais e exportação CSV.
 - Triagem lexical de publicidade jurídica.
-- SQLite com separação de dados por usuário.
+- SQLite com separação de rascunhos por usuário.
 
 ## Integrações não implementadas
 
-- Instagram Insights, publicação e agendamento automáticos dependem de integração própria com a API oficial da Meta, permissões e tokens. O validador atual usa dados inseridos manualmente; a coluna de cobertura serve para marcar se os campos de Insights estão completos ou parciais.
-- O estúdio oferece três opções: gerar manualmente no aplicativo Gemini usando a assinatura, gerar por chamada direta ao OpenRouter Image API, ou criar uma arte tipográfica local.
+- Instagram/Meta: publicação automática, Insights e agendamento não estão conectados nesta versão.
+- Dentro do Agente de conteúdo há três rotas visuais: usar Gemini Plus manualmente com fundo sem texto, gerar diretamente pelo OpenRouter Image API, ou criar uma arte tipográfica local.
 - O modo automático de imagem no OpenRouter requer `OPENROUTER_API_KEY`, acesso a um modelo gerador de imagens e saldo/créditos. As solicitações de imagem não usam o roteador gratuito de texto `openrouter/free`; a cobrança depende do modelo, rota e parâmetros. Consulte os preços por modelo antes de gerar e comece com uma única imagem de teste.
 - O modo manual Gemini Plus não automatiza nem reaproveita OAuth da CLI. O AdvFlow não usa tokens da sessão Gemini CLI para contornar o modelo de API. Para integração automática pela API Google, seria necessária uma chave de API Google com acesso ao modelo de imagem e sua própria política de cobrança.
 - Recuperação de senha por e-mail, MFA e banco de dados gerenciado não estão implementados.
@@ -154,26 +150,12 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 - .github/workflows/validate.yml: verificação de sintaxe
 
 
-## Validação das métricas
-
-O validador aplica uma abordagem de gestão por indicadores e níveis de ação: escolha indicadores que correspondam ao objetivo editorial, defina uma meta e um limite que pede revisão e compare períodos equivalentes. Não existem metas predefinidas universais no sistema, pois taxas variam por perfil, formato, público, período e objetivo.
-
-- **Distribuição:** alcance médio por publicação.
-- **Interação:** interações agregadas divididas pelo alcance total.
-- **Utilidade:** salvamentos e compartilhamentos divididos pelo alcance.
-- **Jornada:** visitas ao perfil divididas pelo alcance e cliques em links divididos pelas visitas registradas, tratados como indicadores-proxy quando os dados têm janelas e fontes comparáveis.
-- **Qualidade de dados:** amostra pequena, dados parciais, alcance zero, datas inválidas, tema vazio e possíveis duplicatas são sinalizados.
-- **Limite de interpretação:** o painel descreve associações e variações; não prova que um post causou uma mudança. Para testar decisões, mantenha comparáveis a janela, o público, o formato e o objetivo e registre o contexto de cada alteração.
-
-No conteúdo de advocacia, métricas de desempenho não autorizam promessas de resultados, comparação profissional, exposição de casos ou chamadas que induzam contratação. A revisão ética continua sendo responsabilidade do profissional. Consulte o [Provimento 205/2021 da OAB](https://www.oab.org.br/leisnormas/legislacao/provimentos/205-2021) e as orientações oficiais vigentes.
-
-
 ## Fluxo de imagens com Gemini Plus
 
-1. Na aba **Estúdio de imagens**, selecione o slide e o estilo visual.
-2. Baixe o prompt gerado pelo AdvFlow ou copie-o para o aplicativo Gemini.
-3. No Gemini, gere uma imagem sem textos e salve o resultado em PNG/JPG/WebP.
-4. Volte ao AdvFlow, envie a imagem e clique em **Aplicar identidade visual e copy**. O app faz o corte vertical 4:5 e aplica a paleta, a tipografia, o título, o corpo e a assinatura do escritório.
+1. Na aba **Agente de conteúdo**, escolha o slide e configure a identidade visual uma única vez na seção **Identidade visual e formato das artes**.
+2. Na seção de criação de arte, copie o **prompt do fundo — sem texto** e cole-o no aplicativo Gemini.
+3. No Gemini, gere uma imagem sem letras, números, logotipos ou pseudo-texto e salve em PNG/JPG/WebP.
+4. Volte ao mesmo Agente, envie o fundo e clique em **Aplicar tipografia e finalizar arte**. O AdvFlow aplica a paleta, a proporção escolhida, a tipografia e o texto exato do título/corpo.
 5. Baixe a arte final em PNG e confira legibilidade, enquadramento e exatidão do texto antes de publicar.
 
 A assinatura Google AI Plus amplia o acesso a recursos de imagem no aplicativo Gemini, mas não deve ser tratada como um saldo geral de chamadas de API em aplicações próprias. A API Gemini tem regras de limite e faturamento próprias. Consulte a [página oficial de planos Google AI](https://one.google.com/intl/pt-BR_br/about/google-ai-plans/) e a [documentação de faturamento da API Gemini](https://ai.google.dev/gemini-api/docs/billing?hl=pt).
@@ -181,7 +163,7 @@ A assinatura Google AI Plus amplia o acesso a recursos de imagem no aplicativo G
 
 ## Geração direta de imagens com OpenRouter
 
-Na aba **Estúdio de imagens**, selecione **OpenRouter — geração direta pela API**. O sistema pode consultar o catálogo de imagens em tempo real em `GET /api/v1/images/models`, gerar por `POST /api/v1/images`, decodificar o resultado e aplicar a identidade visual do escritório.
+Dentro do **Agente de conteúdo**, selecione **OpenRouter — geração direta pela API**. O sistema pode consultar o catálogo de imagens em tempo real em `GET /api/v1/images/models`, gerar por `POST /api/v1/images`, decodificar o resultado e aplicar a identidade visual do escritório.
 
 - A chamada de geração só acontece depois de marcar a confirmação de custo e clicar no botão de geração.
 - O modelo e seus parâmetros são escolhidos do catálogo quando este é carregado; os parâmetros opcionais só são enviados se forem anunciados como suportados pelo modelo. A variável `OPENROUTER_IMAGE_MODEL` escolhe o padrão; deixe o valor indicado acima ou use o identificador exato de outro modelo do catálogo.
