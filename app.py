@@ -1439,10 +1439,7 @@ tabs=st.tabs(tab_labels)
 
 with tabs[0]:
     st.subheader("Painel")
-    with db() as c:
-        a=c.execute("SELECT COUNT(*) n FROM pieces WHERE user_id=?",(user_id,)).fetchone()["n"]
-    st.metric("Peças salvas",a)
-    st.info("Comece pelo Agente de conteúdo. O AdvFlow salva os rascunhos gerados no SQLite.")
+    st.info("Comece pelo Agente de conteúdo. Crie o conteúdo, revise a redação e a triagem ética, configure a identidade visual uma única vez e finalize as artes na mesma tela.")
 
 with tabs[1]:
     st.subheader("Agente de conteúdo")
