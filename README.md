@@ -56,6 +56,18 @@ Na aba **Revisão OAB**, a validação de fundamentos envia o mesmo conteúdo à
 
 A comparação entre IAs é um mecanismo auxiliar de revisão, não uma prova de exatidão ou vigência. Os provedores podem usar modelos iguais ou diferentes. Confirme legislação, alterações e precedentes nas fontes oficiais e submeta a versão final à revisão do profissional responsável. As restrições editoriais seguem como referência o Provimento 205/2021 e o Código de Ética e Disciplina da OAB.
 
+## Tipografia editorial e formatos de arte
+
+O **Estúdio visual** permite selecionar quatro pares tipográficos:
+- **Clássico imponente:** Playfair Display + Montserrat.
+- **Clássico editorial:** Cormorant Garamond + Inter.
+- **Contemporâneo refinado:** Cinzel + Lato.
+- **Moderno limpo:** Playfair Display + Open Sans.
+
+As fontes de código aberto são carregadas sob demanda pelo renderizador e guardadas no cache temporário do servidor; se o download falhar, o renderizador usa fontes de sistema compatíveis. A arte local e a finalização de imagens usam o par escolhido quando a fonte está disponível. As instruções encaminhadas ao Gemini também pedem o par selecionado e uma hierarquia de tamanhos adequada para leitura em celular.
+
+Formatos selecionáveis: **4:5 (1080 × 1350)**, **1:1 (1080 × 1080)** e **9:16 (1080 × 1920)**. O corpo da copy deve priorizar leitura em tela pequena, margem segura, espaço negativo e contraste; não se deve apertar o texto ou reduzir excessivamente a fonte para fazer uma peça longa caber. A IA de imagem pode errar palavras ou acentos: revise a arte final antes de publicar.
+
 ## OpenRouter como provedor alternativo
 
 O AdvFlow pode usar OpenRouter como terceiro provedor de texto, depois de Gemini e Groq e antes do rascunho local. O endpoint é compatível com a API de chat completions e o padrão sugerido é `openrouter/free`; modelos gratuitos têm disponibilidade e limites próprios.
