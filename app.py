@@ -311,7 +311,7 @@ REVISÃO OBRIGATÓRIA ANTES DE ENTREGAR:
 Retorne JSON válido com as chaves:
 titulo, promessa_editorial, angulo_editorial, publico, area_direito, etapa_funil, resumo_estrategico, gancho, slides (lista de objetos titulo/texto/visual/objetivo_do_slide), roteiro (lista de cena/fala/visual), legenda, cta_educativa, hashtags, fontes_para_conferir, checklist_revisao.
 No checklist_revisao, inclua itens sobre português brasileiro, precisão e consistência terminológica jurídica, clareza para o público e fundamentos que precisam de conferência em fonte primária.
-Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação. Não use emojis nem símbolos decorativos no texto final. Evite escassez, urgência artificial, “você não vai acreditar”, “segredo”, “imperdível”, “EU QUERO” e outros recursos de pressão. A abertura pode gerar identificação, mas não sensacionalismo. Use no máximo três hashtags, apenas quando forem úteis.""" 
+Carrossel: 6 a 8 slides e progressão gancho-contexto-explicação-aplicação-cuidados-síntese. Reel: roteiro para 30–45 segundos, cenas com fala natural, indicação de texto na tela e plano visual. Post estático: uma única ideia clara. Legenda: texto completo, sem slides. Artigo curto: título específico, subtítulos úteis, desenvolvimento objetivo, distinção entre regra geral e exceções e conclusão informativa, sem inventar fundamentos. O CTA deve corresponder ao funil e ser educativo ou institucional (por exemplo, salvar, compartilhar informação, consultar fonte oficial, acompanhar conteúdos ou conhecer informações institucionais); nunca pressionar a contratação. Não use emojis nem símbolos decorativos no texto final. Evite escassez, urgência artificial, “você não vai acreditar”, “segredo”, “imperdível”, “EU QUERO” e outros recursos de pressão. A abertura pode gerar identificação, mas não sensacionalismo. Use no máximo três hashtags, apenas quando forem úteis.""" 
 
 LINGUISTIC_REVIEW_SYSTEM = """Você é revisor sênior de português brasileiro e terminologia jurídica brasileira, com rigor editorial. Analise a peça e apresente uma revisão cuidadosa, sem inventar base legal nem se passar por parecer jurídico.
 Verifique ortografia, acentuação, gramática, concordância, regência, pontuação, sintaxe, naturalidade, clareza, coesão e consistência de termos entre título, slides, roteiro e legenda.
@@ -1429,7 +1429,7 @@ with st.sidebar:
     palette=st.selectbox("Paleta visual",list(PALETTES))
     st.divider()
     st.caption("Use IA como apoio editorial. Revise fontes e conformidade antes de publicar.")
-tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Revisão OAB","Configuração","Copy profissional"]
+tab_labels=["Painel","Agente de conteúdo","Estúdio de imagens","Métricas","Radar jurídico","Calendário","Revisão OAB","Configuração"]
 if current_user["role"] == "admin":
     tab_labels.append("Usuários")
 tabs=st.tabs(tab_labels)
@@ -1449,33 +1449,117 @@ with tabs[1]:
     subject_key=f"brief_subject_{brief_version}"
     details_key=f"brief_details_{brief_version}"
     with st.form("brief"):
+        creation_mode=st.selectbox(
+            "Modo de criação",
+            ["Conteúdo jurídico completo","Copy profissional"],
+            help="Conteúdo jurídico completo monta a peça e seus elementos. Copy profissional prioriza uma redação natural, sóbria e pronta para edição, sem emojis nem apelos comerciais.",
+            key="agent_creation_mode"
+        )
         subject=st.text_input("Tema jurídico",value=st.session_state.get("news_brief_subject",""),key=subject_key,placeholder="Ex.: direitos do consumidor em compras online")
-        fmt=st.selectbox("Formato",["Carrossel","Reel","Post estático","Legenda"])
-        audience=st.text_input("Público-alvo",placeholder="Ex.: consumidores, pequenos empresários")
-        goal=st.selectbox("Objetivo editorial",["Educar","Explicar mudança normativa","Responder dúvida frequente","Desmistificar um conceito","Orientar sobre prevenção"])
+        fmt=st.selectbox("Formato",["Carrossel","Reel","Post estático","Legenda","Artigo curto"],key="agent_content_format")
+        audience=st.text_input("Público-alvo",placeholder="Ex.: consumidores, pequenos empresários",key="agent_content_audience")
+        goal=st.selectbox("Objetivo editorial",["Educar","Explicar mudança normativa","Responder dúvida frequente","Desmistificar um conceito","Orientar sobre prevenção"],key="agent_content_goal")
+        area=st.selectbox("Área do Direito",LEGAL_AREAS,key="agent_content_area")
+        tone=st.selectbox("Tom de voz",TONE_OPTIONS,key="agent_content_tone")
         details=st.text_area("Contexto, fonte ou pontos obrigatórios (opcional)",value=st.session_state.get("news_brief_details",""),key=details_key,height=125)
         submit=st.form_submit_button("Gerar conteúdo",type="primary")
     if submit:
-        if not subject.strip(): st.warning("Informe o tema.")
+        if not subject.strip():
+            st.warning("Informe o tema jurídico.")
         else:
-            with st.spinner("Preparando rascunho…"): data,provider=generate(subject,fmt,audience or "público geral",goal,details)
-            if details:
-                data["contexto_informado"]=details
-                if "URL original:" in details:
-                    source_url=next((line.split(":",1)[1].strip() for line in details.splitlines() if line.startswith("URL original:")), "")
-                    if source_url: data["fontes_para_conferir"]=list(data.get("fontes_para_conferir",[]))+["Notícia original para revisão: "+source_url]
-            st.session_state.pop("news_brief_subject",None)
-            st.session_state.pop("news_brief_details",None)
-            st.session_state.pop("news_brief_ready",None)
-            st.session_state.pop("language_legal_review",None)
-            st.session_state.pop("language_legal_review_for_title",None)
-            st.session_state["draft"]=data; st.session_state["draft_provider"]=provider
+            try:
+                if creation_mode == "Copy profissional":
+                    copy_format_map={
+                        "Legenda":"Legenda para Instagram",
+                        "Carrossel":"Carrossel",
+                        "Reel":"Reel",
+                        "Post estático":"Post estático",
+                        "Artigo curto":"Artigo curto"
+                    }
+                    with st.spinner("Redigindo a copy profissional..."):
+                        copy_result,provider=generate_professional_copy(
+                            subject, audience or "público geral", copy_format_map.get(fmt,fmt),
+                            area, goal, tone, details
+                        )
+                    normalized_slides=[]
+                    for idx, item in enumerate(copy_result.get("slides",[]) or [],1):
+                        if isinstance(item,dict):
+                            normalized_slides.append({
+                                "titulo":str(item.get("titulo") or f"Ideia {idx}"),
+                                "texto":str(item.get("texto") or ""),
+                                "visual":str(item.get("visual") or "Direção editorial específica ao tema, composição limpa e bastante espaço negativo."),
+                                "objetivo_do_slide":str(item.get("objetivo_do_slide") or "Explicar uma ideia central")
+                            })
+                    normalized_script=[]
+                    for item in copy_result.get("roteiro",[]) or []:
+                        if isinstance(item,dict):
+                            normalized_script.append({
+                                "cena":str(item.get("cena") or ""),
+                                "fala":str(item.get("fala") or ""),
+                                "visual":str(item.get("visual") or item.get("texto_na_tela") or ""),
+                                "texto_na_tela":str(item.get("texto_na_tela") or "")
+                            })
+                    data={
+                        "titulo":str(copy_result.get("titulo") or subject),
+                        "promessa_editorial":str(copy_result.get("nota_editorial") or "Conteúdo jurídico informativo"),
+                        "angulo_editorial":str(goal),
+                        "publico":audience or "público geral",
+                        "area_direito":area,
+                        "tom_de_voz":tone,
+                        "etapa_funil":"Educação informativa",
+                        "resumo_estrategico":str(copy_result.get("nota_editorial") or "Copy profissional com foco em clareza, precisão e caráter informativo."),
+                        "gancho":str(copy_result.get("abertura") or ""),
+                        "slides":normalized_slides,
+                        "roteiro":normalized_script,
+                        "legenda":str(copy_result.get("copy_principal") or ""),
+                        "cta_educativa":str(copy_result.get("cta_informativa") or ""),
+                        "hashtags":copy_result.get("hashtags",[]) or [],
+                        "fontes_para_conferir":copy_result.get("pontos_juridicos_a_conferir",[]) or [],
+                        "checklist_revisao":copy_result.get("alertas_eticos",[]) or [],
+                        "formato":fmt,
+                        "_copy_profissional":True,
+                        "_copy_profissional_abertura":str(copy_result.get("abertura") or ""),
+                        "_copy_profissional_alertas":copy_result.get("alertas_eticos",[]) or [],
+                        "_copy_profissional_pontos_fonte":copy_result.get("pontos_juridicos_a_conferir",[]) or []
+                    }
+                    for meta_key in ("_modelo_utilizado","_provedor_utilizado"):
+                        if copy_result.get(meta_key):
+                            data[meta_key]=copy_result[meta_key]
+                else:
+                    with st.spinner("Preparando rascunho..."):
+                        data,provider=generate(
+                            subject,fmt,audience or "público geral",goal,details,
+                            area=area,tone=tone
+                        )
+                if details:
+                    data["contexto_informado"]=details
+                    if "URL original:" in details:
+                        source_url=next((line.split(":",1)[1].strip() for line in details.splitlines() if line.startswith("URL original:")), "")
+                        if source_url:
+                            data["fontes_para_conferir"]=list(data.get("fontes_para_conferir",[]))+["Notícia original para revisão: "+source_url]
+                st.session_state.pop("news_brief_subject",None)
+                st.session_state.pop("news_brief_details",None)
+                st.session_state.pop("news_brief_ready",None)
+                st.session_state.pop("language_legal_review",None)
+                st.session_state.pop("language_legal_review_for_title",None)
+                st.session_state.pop("draft_caption",None)
+                st.session_state["draft"]=data
+                st.session_state["draft_provider"]=provider
+            except Exception as exc:
+                st.error("Não foi possível gerar o conteúdo: "+str(exc))
     if "draft" in st.session_state:
         d=st.session_state["draft"]; st.caption("Motor utilizado: "+st.session_state.get("draft_provider",""))
         if d.get("aviso"):st.warning(d["aviso"])
         if d.get("_modelo_utilizado"):
             st.caption("Modelo utilizado: "+str(d["_modelo_utilizado"]))
         st.write("**Título:**",d.get("titulo","")); st.write(d.get("resumo_estrategico",""))
+        if d.get("_copy_profissional_abertura"):
+            st.markdown("**Abertura editorial**")
+            st.write(d["_copy_profissional_abertura"])
+        if d.get("_copy_profissional_alertas"):
+            with st.expander("Alertas éticos da copy"):
+                for alert in d["_copy_profissional_alertas"]:
+                    st.write("- "+str(alert))
         current_draft_format = str(fmt if "fmt" in locals() else d.get("formato", "Carrossel")).lower()
         for i,s in enumerate(d.get("slides",[]),1):
             with st.expander(f"{i}. {s.get('titulo','Slide')}"):
@@ -1515,7 +1599,8 @@ with tabs[1]:
                             key=f"gemini_carousel_slide_prompt_{i}"
                         )
         if d.get("roteiro"):st.dataframe(pd.DataFrame(d["roteiro"]),use_container_width=True,hide_index=True)
-        st.text_area("Legenda editável",d.get("legenda",""),key="draft_caption",height=130)
+        caption_label = "Copy principal editável" if d.get("_copy_profissional") else "Legenda editável"
+        st.text_area(caption_label,d.get("legenda",""),key="draft_caption",height=180 if d.get("_copy_profissional") else 130)
         st.write("**Hashtags:**"," ".join(d.get("hashtags",[])))
         st.write("**Fontes para conferir:**")
         for s in d.get("fontes_para_conferir",[]):st.write("- "+str(s))
@@ -2260,102 +2345,8 @@ with tabs[7]:
 
 
 
-with tabs[8]:
-    st.subheader("Copy profissional")
-    st.caption("Criação editorial para marketing jurídico informativo: escrita natural, sem emojis, clickbait, urgência artificial ou chamadas para contratação.")
-    with st.form("professional_copy_form"):
-        copy_col1, copy_col2 = st.columns(2)
-        with copy_col1:
-            copy_subject = st.text_input("Tema jurídico", placeholder="Ex.: cancelamento de compra pela internet", key="professional_copy_subject")
-            copy_audience = st.selectbox("Público-alvo", AUDIENCE_OPTIONS, key="professional_copy_audience")
-            copy_area = st.selectbox("Área do Direito", LEGAL_AREAS, key="professional_copy_area")
-            copy_format = st.selectbox("Formato", ["Legenda para Instagram", "Carrossel", "Reel", "Post estático", "Artigo curto"], key="professional_copy_format")
-        with copy_col2:
-            copy_objective = st.selectbox(
-                "Objetivo editorial",
-                ["Explicar um direito ou dever", "Responder uma dúvida frequente", "Explicar uma mudança normativa", "Evitar erro comum", "Checklist de prevenção", "Desmistificar um conceito"],
-                key="professional_copy_objective"
-            )
-            copy_tone = st.selectbox(
-                "Tom de voz",
-                ["Didático e natural", "Editorial sofisticado", "Acolhedor e sóbrio", "Analítico e acessível", "Executivo para empresas"],
-                key="professional_copy_tone"
-            )
-        copy_details = st.text_area(
-            "Contexto, fatos e fonte oficial (opcional)",
-            height=160,
-            placeholder="Cole o trecho oficial, o link como referência e o contexto que deve ser respeitado. Sem o teor da fonte primária, os fundamentos serão sinalizados para conferência.",
-            key="professional_copy_details"
-        )
-        copy_submit = st.form_submit_button("Gerar copy profissional", type="primary")
-    if copy_submit:
-        if not copy_subject.strip():
-            st.warning("Informe o tema jurídico.")
-        else:
-            try:
-                with st.spinner("Redigindo uma peça editorial e revisando as restrições do briefing..."):
-                    copy_result, copy_provider = generate_professional_copy(
-                        copy_subject, copy_audience, copy_format, copy_area,
-                        copy_objective, copy_tone, copy_details
-                    )
-                st.session_state["professional_copy_result"] = copy_result
-                st.session_state["professional_copy_provider"] = copy_provider
-                st.session_state["professional_copy_main_edit"] = str(copy_result.get("copy_principal", ""))
-            except Exception as exc:
-                st.error("Não foi possível gerar a copy profissional: " + str(exc))
-    pro_copy = st.session_state.get("professional_copy_result")
-    if pro_copy:
-        st.caption("Integração utilizada: " + str(st.session_state.get("professional_copy_provider", "IA")))
-        if pro_copy.get("titulo"):
-            st.markdown("### " + str(pro_copy.get("titulo")))
-        st.text_area("Texto principal editável", value=str(pro_copy.get("copy_principal", "")), height=260, key="professional_copy_main_edit")
-        slides_out = pro_copy.get("slides", [])
-        if slides_out:
-            st.markdown("#### Conteúdo do carrossel")
-            for idx, slide_out in enumerate(slides_out, 1):
-                with st.expander(f"Slide {idx}: {slide_out.get('titulo', 'Sem título')}"):
-                    st.write(slide_out.get("texto", ""))
-        script_out = pro_copy.get("roteiro", [])
-        if script_out:
-            st.markdown("#### Roteiro")
-            st.dataframe(pd.DataFrame(script_out), use_container_width=True, hide_index=True)
-        if pro_copy.get("cta_informativa"):
-            st.markdown("**CTA informativa**")
-            st.write(pro_copy["cta_informativa"])
-        if pro_copy.get("hashtags"):
-            st.markdown("**Hashtags**")
-            st.write(" ".join(str(item) for item in pro_copy.get("hashtags", [])[:3]))
-        if pro_copy.get("pontos_juridicos_a_conferir"):
-            st.markdown("**Fundamentos a conferir em fonte oficial**")
-            for item in pro_copy.get("pontos_juridicos_a_conferir", []):
-                st.write("- " + str(item))
-        if pro_copy.get("alertas_eticos"):
-            st.markdown("**Alertas editoriais e éticos**")
-            for item in pro_copy.get("alertas_eticos", []):
-                st.write("- " + str(item))
-        if pro_copy.get("nota_editorial"):
-            st.caption(str(pro_copy["nota_editorial"]))
-        export_copy = {
-            "titulo": pro_copy.get("titulo", ""),
-            "copy_principal": st.session_state.get("professional_copy_main_edit", ""),
-            "slides": slides_out,
-            "roteiro": script_out,
-            "cta_informativa": pro_copy.get("cta_informativa", ""),
-            "hashtags": pro_copy.get("hashtags", []),
-            "pontos_juridicos_a_conferir": pro_copy.get("pontos_juridicos_a_conferir", []),
-            "alertas_eticos": pro_copy.get("alertas_eticos", [])
-        }
-        st.download_button(
-            "Baixar copy revisável (.txt)",
-            json.dumps(export_copy, ensure_ascii=False, indent=2),
-            file_name="advflow_copy_profissional.txt",
-            mime="text/plain",
-            key="download_professional_copy"
-        )
-        st.caption("Antes de publicar, confira a fonte primária, os fatos e as regras aplicáveis. A geração por IA não certifica conformidade jurídica.")
-
 if current_user["role"] == "admin":
-    with tabs[9]:
+    with tabs[8]:
         st.subheader("Gestão de usuários")
         st.caption("Crie contas individuais para a equipe. A senha temporária é exibida no momento da criação ou redefinição.")
         with st.form("create_user_form"):
