@@ -1036,7 +1036,8 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
     sources = "\n".join("- " + str(x) for x in draft.get("fontes_para_conferir", [])) or "Nenhuma fonte indicada pelo agente; não invente fontes."
     fmt_lower = str(fmt).lower()
     video_mode = "REEL/VÍDEO: produzir um Reel final de 30–45 segundos, vertical 9:16 (1080×1920), com ritmo natural e narração integral. NÃO comprimir todo o roteiro em um clipe curto nem acelerar a fala. Planejar 5–7 cenas com duração indicada por cena, pausas naturais e transições discretas; manter cada cena tempo suficiente para compreender a fala e ler o texto na tela. Se a ferramenta só gerar clipes de 8–10 segundos, NÃO fingir que isso é o vídeo completo: gerar clipes separados e numerados que, juntos, cubram os 30–45 segundos, mantendo personagem, roupa, cenário, iluminação e identidade visual consistentes, e fornecer a ordem de montagem. Enquadramento obrigatório vertical 9:16, nunca horizontal 16:9; manter rosto, mãos e todos os textos dentro da área segura central, com margens de pelo menos 10% nas laterais e 12% no topo/rodapé. Não cortar cabeça, mãos, legendas ou palavras; usar pouco texto por tela, alto contraste e tamanho legível em celular. A narração deve seguir a copy fornecida sem omitir frases; se não couber, aumentar a duração ou dividir em mais clipes, nunca acelerar. Antes de concluir, verificar proporção, duração total, cortes, ritmo, sincronização entre fala e imagem e legibilidade. Se não puder gerar vídeo diretamente, entregar plano de produção cena a cena com duração, narração completa e prompts individuais prontos."
-    image_mode = "CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo, completo e numerado para CADA slide. Cada prompt deve pedir somente a arte daquele slide, com texto exato e formato vertical 4:5. Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
+    image_size = {"4:5": "1080 × 1350 pixels", "1:1": "1080 × 1080 pixels", "9:16": "1080 × 1920 pixels"}.get(aspect_ratio, "1080 × 1350 pixels")
+    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo, completo e numerado para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {aspect_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
     if "reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower:
         media_instructions = video_mode
     elif "legenda" in fmt_lower:
@@ -1624,6 +1625,7 @@ with tabs[2]:
     slide_idx=options.index(selected); active=slides[slide_idx]
     title=st.text_input("Título da arte",value=active.get("titulo",draft.get("titulo","Tema jurídico")),key="studio_title")
     body=st.text_area("Texto que aparecerá na arte",value=active.get("texto",""),height=105,key="studio_body")
+    st.caption("Para assuntos densos, mantenha na arte a ideia principal e deixe a explicação completa na legenda. Isso melhora a leitura em celular.")
     visual_direction=st.text_area("Direção visual específica",value=active.get("visual",""),height=90,key="studio_direction",help="Detalhe objeto, ambiente, gesto, luz, enquadramento e metáfora visual. Evite apenas 'imagem jurídica'.")
     visual_type=st.selectbox("Tipo de composição",["Cena editorial","Conceito visual","Infográfico sem texto","Fluxo de etapas","Comparação de conceitos","Linha do tempo visual","Checklist visual","Colagem editorial"],index=0,help="Princípio adaptado do fluxo de ilustração do Hermes: definir tipo, estilo e paleta antes de gerar.")
     visual_style=st.selectbox("Estilo visual",["Fotografia editorial premium","Ilustração conceitual","Colagem contemporânea","3D sofisticado","Documental cinematográfica","Infográfico ilustrado"],index=0)
@@ -1636,18 +1638,17 @@ with tabs[2]:
     )
     st.caption(TYPOGRAPHY_SPECS[typography_choice]["description"] + " O AdvFlow tenta carregar as fontes em formato TTF no servidor; se a hospedagem estiver sem acesso a elas, usa uma fonte de sistema compatível.")
     ratio_labels={
-        "Feed vertical — 4:5 (1080 × 1350)": "4:5",
-        "Feed quadrado — 1:1 (1080 × 1080)": "1:1",
-        "Reels e Stories — 9:16 (1080 × 1920)": "9:16"
+        "4:5": "Feed vertical — 4:5 (1080 × 1350)",
+        "1:1": "Feed quadrado — 1:1 (1080 × 1080)",
+        "9:16": "Reels e Stories — 9:16 (1080 × 1920)"
     }
-    ratio_label=st.selectbox(
+    selected_ratio=st.selectbox(
         "Formato da arte",
         list(ratio_labels),
-        index=list(ratio_labels.values()).index(st.session_state.get("studio_aspect_ratio", "4:5")) if st.session_state.get("studio_aspect_ratio", "4:5") in ratio_labels.values() else 0,
-        key="studio_aspect_ratio_label"
+        index=list(ratio_labels).index(st.session_state.get("studio_aspect_ratio", "4:5")) if st.session_state.get("studio_aspect_ratio", "4:5") in ratio_labels else 0,
+        format_func=lambda ratio: ratio_labels[ratio],
+        key="studio_aspect_ratio"
     )
-    selected_ratio=ratio_labels[ratio_label]
-    st.session_state["studio_aspect_ratio"]=selected_ratio
     selected_height={"4:5":1350,"1:1":1080,"9:16":1920}[selected_ratio]
     palette_options=list(PALETTES)
     chosen_palette=st.selectbox("Paleta para a arte",palette_options,index=palette_options.index(palette) if palette in palette_options else 0,key="studio_palette")
