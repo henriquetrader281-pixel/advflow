@@ -1035,9 +1035,10 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
     hashtags = " ".join(draft.get("hashtags", [])) if isinstance(draft.get("hashtags", []), list) else str(draft.get("hashtags", ""))
     sources = "\n".join("- " + str(x) for x in draft.get("fontes_para_conferir", [])) or "Nenhuma fonte indicada pelo agente; não invente fontes."
     fmt_lower = str(fmt).lower()
+    layout_ratio = "9:16" if ("reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower) else aspect_ratio
     video_mode = "REEL/VÍDEO: produzir um Reel final de 30–45 segundos, vertical 9:16 (1080×1920), com ritmo natural e narração integral. NÃO comprimir todo o roteiro em um clipe curto nem acelerar a fala. Planejar 5–7 cenas com duração indicada por cena, pausas naturais e transições discretas; manter cada cena tempo suficiente para compreender a fala e ler o texto na tela. Se a ferramenta só gerar clipes de 8–10 segundos, NÃO fingir que isso é o vídeo completo: gerar clipes separados e numerados que, juntos, cubram os 30–45 segundos, mantendo personagem, roupa, cenário, iluminação e identidade visual consistentes, e fornecer a ordem de montagem. Enquadramento obrigatório vertical 9:16, nunca horizontal 16:9; manter rosto, mãos e todos os textos dentro da área segura central, com margens de pelo menos 10% nas laterais e 12% no topo/rodapé. Não cortar cabeça, mãos, legendas ou palavras; usar pouco texto por tela, alto contraste e tamanho legível em celular. A narração deve seguir a copy fornecida sem omitir frases; se não couber, aumentar a duração ou dividir em mais clipes, nunca acelerar. Antes de concluir, verificar proporção, duração total, cortes, ritmo, sincronização entre fala e imagem e legibilidade. Se não puder gerar vídeo diretamente, entregar plano de produção cena a cena com duração, narração completa e prompts individuais prontos."
-    image_size = {"4:5": "1080 × 1350 pixels", "1:1": "1080 × 1080 pixels", "9:16": "1080 × 1920 pixels"}.get(aspect_ratio, "1080 × 1350 pixels")
-    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo, completo e numerado para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {aspect_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
+    image_size = {"4:5": "1080 × 1350 pixels", "1:1": "1080 × 1080 pixels", "9:16": "1080 × 1920 pixels"}.get(layout_ratio, "1080 × 1350 pixels")
+    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo, completo e numerado para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {layout_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
     if "reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower:
         media_instructions = video_mode
     elif "legenda" in fmt_lower:
@@ -1055,7 +1056,7 @@ IDENTIDADE E DIREÇÃO VISUAL
 Paleta: {palette_name}
 Estilo visual: {visual_style}
 SISTEMA TIPOGRÁFICO OBRIGATÓRIO
-{typography_guidance(typography_name, aspect_ratio)}
+{typography_guidance(typography_name, layout_ratio)}
 Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo; use apenas a numeração do slide quando necessária.
 Público-alvo: {audience}
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
