@@ -1,6 +1,6 @@
 # AdvFlow — estúdio de conteúdo jurídico
 
-Aplicação Streamlit para produção de conteúdo informativo, arte tipográfica, métricas manuais, calendário editorial e monitoramento de notícias jurídicas.
+Aplicação Streamlit para produção de conteúdo jurídico informativo, criação visual, métricas manuais e monitoramento de notícias jurídicas.
 
 ## Corrigir perda de acesso e manter o login persistente
 
@@ -24,13 +24,13 @@ Quando o banco remoto estiver vazio, a aplicação tenta migrar automaticamente 
 
 Se o Supabase estiver configurado mas indisponível ou sem a tabela, o login falha de forma explícita em vez de criar silenciosamente uma conta em outro banco local.
 
-**Limite importante:** esta mudança torna persistente o cadastro/login de usuários. O conteúdo salvo, as métricas e o calendário ainda usam SQLite local nesta versão e podem exigir armazenamento persistente separado.
+**Limite importante:** esta mudança torna persistente o cadastro/login de usuários. O conteúdo salvo e as métricas ainda usam SQLite local nesta versão e podem exigir armazenamento persistente separado.
 
 ## Acesso e usuários
 
 - Antes de abrir o app à internet, configure INITIAL_SETUP_KEY em Streamlit Secrets com um valor longo e aleatório privado. Essa chave protege a criação do primeiro administrador e não é a senha normal de login.
 - No primeiro acesso, insira essa chave e crie o administrador na própria tela inicial. Use uma senha forte com pelo menos 12 caracteres.
-- O administrador cria contas adicionais pela aba Usuários. Cada conta tem sua própria senha e vê apenas suas peças, métricas e calendário.
+- O administrador cria contas adicionais pela aba Usuários. Cada conta tem sua própria senha e vê apenas suas peças e métricas.
 - Senhas temporárias são geradas pela aplicação e precisam ser alteradas no primeiro acesso. O administrador pode redefinir ou desativar contas.
 - Cinco tentativas de senha incorreta bloqueiam o login por 15 minutos.
 - Esta versão não envia recuperação de senha por e-mail; solicite redefinição ao administrador.
@@ -48,13 +48,13 @@ As senhas não são armazenadas em texto simples: a aplicação usa PBKDF2-HMAC-
 
 Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignore.
 
-## Copy profissional e validação jurídica por múltiplas IAs
+## Copy profissional e triagem ética da publicidade jurídica
 
 Dentro da aba **Agente de conteúdo**, escolha **Copy profissional** no campo “Modo de criação” para produzir legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O modo reutiliza o tema, público, formato, área do Direito, tom e contexto do formulário principal. A peça resultante continua disponível na mesma tela para edição, revisão linguística e jurídica, salvamento e uso no estúdio visual. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
 
-Dentro da aba **Agente de conteúdo**, abra o expansor **Revisão OAB e conferência jurídica** para fazer a triagem ética preliminar e validar fundamentos jurídicos com as integrações configuradas. A validação compara referências e correções sugeridas e destaca divergências de status quando os modelos identificam a mesma referência. Para confrontar a redação de artigos, **cole o trecho relevante da fonte primária oficial** no campo próprio. Um link isolado não é tratado como se a página tivesse sido consultada.
+Dentro da aba **Agente de conteúdo**, abra o expansor **Revisão OAB e conferência jurídica** para fazer uma triagem lexical preliminar de possíveis alertas na publicidade jurídica. Essa checagem ajuda a apontar expressões que merecem revisão, mas não certifica conformidade com as regras da OAB nem substitui a análise do profissional responsável.
 
-A comparação entre IAs é um mecanismo auxiliar de revisão, não uma prova de exatidão ou vigência. Os provedores podem usar modelos iguais ou diferentes. Confirme legislação, alterações e precedentes nas fontes oficiais e submeta a versão final à revisão do profissional responsável. As restrições editoriais seguem como referência o Provimento 205/2021 e o Código de Ética e Disciplina da OAB.
+Antes de publicar, confira o texto integral, o contexto e as regras oficiais vigentes. Use como referência o Provimento 205/2021 e o Código de Ética e Disciplina da OAB, sem tratar a triagem automática como parecer jurídico.
 
 ## Tipografia editorial e formatos de arte
 
@@ -127,7 +127,6 @@ RSS pode ficar indisponível ou omitir datas/resumos. A classificação temátic
 - Alertas de qualidade: datas inválidas, alcance zero, temas vazios, dados parciais e possíveis registros duplicados; os dados antigos não são alterados automaticamente.
 - Configuração de metas por histórico e objetivo editorial, sem aplicar benchmarks universais ou apresentar correlação como causalidade.
 - Métricas manuais e exportação CSV.
-- Calendário editorial e exportação CSV.
 - Triagem lexical de publicidade jurídica.
 - SQLite com separação de dados por usuário.
 
