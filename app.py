@@ -1031,8 +1031,8 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
             image_title_for_prompt = title
         text_copy.append(f"SLIDE {i}\nTÍTULO EDITORIAL: {title_for_prompt}\nCOPY TEXTUAL: {body}")
         image_copy.append(
-            f"ARTE/IMAGEM {i}\nTEMA/TÍTULO: {image_title_for_prompt}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
-            f"TEXTO QUE DEVE APARECER NA ARTE: {image_title_for_prompt}\nTEXTO DE APOIO: {body}"
+            f"FUNDO VISUAL {i} (não renderizar texto)\nCONTEXTO/TEMA: {image_title_for_prompt}\nIDEIA VISUAL SOLICITADA PELO AGENTE: {visual or 'Criar conceito visual específico para o conteúdo.'}\n"
+            f"REFERÊNCIA DE COPY (não desenhar na imagem; será sobreposta pelo AdvFlow): {image_title_for_prompt} — {body}"
         )
     roteiro = draft.get("roteiro") or []
     video_lines = []
@@ -1051,13 +1051,13 @@ def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público ge
     layout_ratio = "9:16" if ("reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower) else aspect_ratio
     video_mode = "REEL/VÍDEO: produzir um Reel final de 30–45 segundos, vertical 9:16 (1080×1920), com ritmo natural e narração integral. NÃO comprimir todo o roteiro em um clipe curto nem acelerar a fala. Planejar 5–7 cenas com duração indicada por cena, pausas naturais e transições discretas; manter cada cena tempo suficiente para compreender a fala e ler o texto na tela. Se a ferramenta só gerar clipes de 8–10 segundos, NÃO fingir que isso é o vídeo completo: gerar clipes separados e numerados que, juntos, cubram os 30–45 segundos, mantendo personagem, roupa, cenário, iluminação e identidade visual consistentes, e fornecer a ordem de montagem. Enquadramento obrigatório vertical 9:16, nunca horizontal 16:9; manter rosto, mãos e todos os textos dentro da área segura central, com margens de pelo menos 10% nas laterais e 12% no topo/rodapé. Não cortar cabeça, mãos, legendas ou palavras; usar pouco texto por tela, alto contraste e tamanho legível em celular. A narração deve seguir a copy fornecida sem omitir frases; se não couber, aumentar a duração ou dividir em mais clipes, nunca acelerar. Antes de concluir, verificar proporção, duração total, cortes, ritmo, sincronização entre fala e imagem e legibilidade. Se não puder gerar vídeo diretamente, entregar plano de produção cena a cena com duração, narração completa e prompts individuais prontos."
     image_size = {"4:5": "1080 × 1350 pixels", "1:1": "1080 × 1080 pixels", "9:16": "1080 × 1920 pixels"}.get(layout_ratio, "1080 × 1350 pixels")
-    image_mode = f"CARROSSEL/IMAGENS: para carrossel, não tente condensar tudo em uma única imagem nem presuma que várias imagens serão geradas em um único pedido. Defina a direção visual consistente do conjunto e prepare um prompt autônomo e completo para CADA slide. Cada prompt deve pedir somente a arte daquele slide, no formato {layout_ratio} ({image_size}). Não considere o carrossel concluído depois do slide 1; gere as imagens individualmente, uma solicitação por slide, usando os prompts individuais disponibilizados no AdvFlow. Nunca agrupe várias artes em mosaico, grade ou storyboard."
+    image_mode = f"CARROSSEL/IMAGENS: gere um fundo visual limpo para cada slide, no formato {layout_ratio} ({image_size}), sem letras, números ou texto. A copy será aplicada depois no AdvFlow com fontes reais. Prepare um prompt autônomo por slide, com variação visual relevante e identidade consistente; nunca agrupe imagens em mosaico, grade ou storyboard."
     if "reel" in fmt_lower or "vídeo" in fmt_lower or "video" in fmt_lower:
         media_instructions = video_mode
     elif "legenda" in fmt_lower:
         media_instructions = "FORMATO LEGENDA: priorize a copy textual e ofereça uma proposta visual opcional relacionada ao tema."
     elif "estático" in fmt_lower or "estatico" in fmt_lower:
-        media_instructions = "POST ESTÁTICO: crie uma arte final única com a copy textual e a direção visual específica."
+        media_instructions = "POST ESTÁTICO: crie um fundo visual único, de alta qualidade e sem letras; a copy será aplicada depois pelo AdvFlow com tipografia real."
     else:
         media_instructions = image_mode
     return f"""Você é diretor criativo, designer editorial e produtor audiovisual sênior para conteúdo jurídico brasileiro. Use o conteúdo abaixo para produzir a copy e a peça de mídia solicitada.
@@ -1099,7 +1099,7 @@ FONTES PARA CONFERIR (não inventar fontes):
 REGRAS IMPORTANTES
 - São duas entregas diferentes: COPY TEXTUAL e COPY/DIREÇÃO DE MÍDIA. Não misture nem substitua uma pela outra.
 - Preserve o sentido jurídico e reproduza os textos fornecidos com precisão. Não invente leis, artigos, prazos, estatísticas, decisões, nomes ou fontes.
-- Para imagens, gere a arte final com tipografia e texto integrado; não entregue apenas um fundo, salvo se eu pedir explicitamente fundo.
+- Para imagens, entregue o fundo visual sem texto, letras, números, logotipos ou pseudo-texto. A tipografia e a copy serão aplicadas depois pelo AdvFlow para preservar a grafia exata.
 - Para vídeo, priorize Reel final de 30–45 segundos em 9:16; não aceite clipe curto ou horizontal como entrega final. Se houver limite de duração, divida em clipes numerados que somem a duração pedida. Não acelere nem corte a narração para caber; preserve áreas seguras e confira cortes, ritmo e legibilidade. Se o Gemini não puder renderizar vídeo nesta conversa, forneça um plano de produção e prompts cena a cena, sem afirmar que o vídeo foi gerado.
 - Não remova texto importante para fazê-lo caber; reorganize a composição ou sinalize o problema.
 - Respeite a publicidade informativa e discreta da advocacia e as regras aplicáveis da OAB. Sem promessa de resultado, pressão comercial ou captação indevida.
@@ -1114,52 +1114,40 @@ REGRAS IMPORTANTES
 """
 
 def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5", visual_type="Cena editorial", visual_style="Fotografia editorial premium", visual_density="Equilibrada"):
-    raw_title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
-    body = str(slide.get("texto", "")).strip()
-    visual = str(slide.get("visual", "")).strip()
-    generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {slide_number}"}
-    title_is_generic = raw_title.casefold().strip(" :.-") in generic_titles
-    title_instruction = (
-        f"O rótulo interno “{raw_title}” NÃO pode aparecer na arte. Crie um título editorial curto, específico e natural a partir do texto abaixo."
-        if title_is_generic else
-        f"Use este título, após corrigir apenas eventual erro claro de português: {raw_title}"
-    )
-    return f"""Gere SOMENTE UMA imagem final: SLIDE {slide_number} DE {total_slides} de um carrossel profissional para Instagram.
+    """Prompt individual para criar um fundo nítido e sem texto; AdvFlow aplica a tipografia depois."""
+    raw_title=str(slide.get("titulo",f"Slide {slide_number}")).strip()
+    body=str(slide.get("texto","")).strip()
+    visual=str(slide.get("visual","")).strip()
+    return f"""Gere UMA imagem de FUNDO sem texto para o slide {slide_number} de um carrossel profissional para Instagram.
+A imagem será finalizada depois no AdvFlow. Não desenhe as palavras fornecidas: o título e o corpo serão aplicados pelo renderizador com fontes reais, para preservar a grafia e evitar letras deformadas.
 
 FORMATO E COMPOSIÇÃO
-- Proporção {aspect_ratio}; use 1080 × 1350 px para 4:5, 1080 × 1080 px para 1:1 e 1080 × 1920 px para 9:16. Uma arte individual, não uma página com várias miniaturas.
-- Não gerar o carrossel inteiro em uma imagem, nem grade, mosaico, storyboard ou colagem de slides.
-- Gere exatamente o slide {slide_number}; não substitua por outro slide.
-- Sistema visual consistente em todos os slides: {palette_name}; padrão editorial premium, iluminação sofisticada, materiais realistas e paleta consistente, mas com cena/metáfora visual específica para cada argumento.
-- Acabamento de revista profissional: high-end corporate editorial, sophisticated, trustworthy, calm authority, cinematic yet natural lighting, precise composition and ample safe margins.
-- Preferências visuais escolhidas: tipo {visual_type}; estilo {visual_style}; densidade {visual_density}. Preserve clareza, hierarquia e leitura em celular.
-- SISTEMA TIPOGRÁFICO: {typography_guidance(typography_name, aspect_ratio)}
-- Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
-- Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo. Não inclua numeração de slides, frações como 1/3 ou marcadores de sequência.
+- Proporção {aspect_ratio}: 4:5 = 1080 × 1350 px; 1:1 = 1080 × 1080 px; 9:16 = 1080 × 1920 px.
+- Gere somente o fundo do slide {slide_number}; nunca um carrossel inteiro, grade, mosaico, colagem de páginas ou storyboard.
+- Design comercial editorial premium, equilibrado e pronto para receber tipografia profissional depois.
+- Iluminação de estúdio controlada, sombras deliberadas, materiais nítidos, textura realista, foco preciso no assunto principal e acabamento de revista profissional.
+- Contraste claro, cores bem definidas dentro da paleta escolhida; evite aparência apagada, lavada, enevoada, sem contraste ou fora de foco.
+- Reserve espaço negativo amplo principalmente à esquerda e na parte inferior para que o AdvFlow aplique título e copy sem cobrir o assunto principal.
+- Identidade visual consistente: {palette_name}. Tipografia que será aplicada depois no AdvFlow: {typography_guidance(typography_name, aspect_ratio)}
+- Preferências visuais escolhidas: tipo {visual_type}; estilo {visual_style}; densidade {visual_density}. Preserve legibilidade e uma hierarquia visual clara.
 
-CONTEXTO EDITORIAL
-Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
-Público: {draft.get("publico", "público geral")}
-Título geral do carrossel: {draft.get("titulo", "Conteúdo jurídico")}
+CONTEXTO EDITORIAL — APENAS PARA ORIENTAR A CENA; NÃO RENDERIZAR COMO TEXTO
+Área do Direito: {draft.get("area_direito","Geral / interdisciplinar")}
+Público: {draft.get("publico","público geral")}
+Tema geral: {draft.get("titulo","Conteúdo jurídico")}
+Título de referência deste slide: {raw_title}
+Ideia explicada pelo slide: {body}
+Direção visual sugerida: {visual or "Escolha uma cena, um objeto ou uma situação concreta diretamente ligada à ideia."}
 
-TÍTULO DA ARTE
-{title_instruction}
-
-TEXTO DA ARTE
-{body}
-
-DIREÇÃO VISUAL
-{visual or "Criar uma metáfora visual editorial específica para a ideia deste slide."}
-
-REGRAS DE PORTUGUÊS E PRECISÃO JURÍDICA
-- Use português brasileiro natural e correto: revise acentuação, ortografia, concordância, regência e pontuação.
-- Não deixe a palavra “Gancho” nem títulos estruturais como título público. Crie uma manchete editorial coerente com o assunto.
-- Prefira palavras comuns. Não mostre termos jurídicos isolados sem explicação. Se usar “ato ilícito”, “nexo causal” ou “dano”, explique cada termo brevemente em linguagem simples no próprio slide, sem simplificar de forma juridicamente incorreta.
-- Não invente leis, artigos, prazos, estatísticas, decisões ou fontes. Não altere a copy de modo a mudar o sentido jurídico.
-- Gere uma arte pronta para publicação, não apenas uma descrição ou um fundo. Não acrescente assinatura, OAB ou dados de escritório no rodapé.
-- Entregue a imagem final agora, sem explicar o processo.
+RESTRIÇÕES ABSOLUTAS
+- Não incluir texto, letras, palavras, pseudo-letras, números, legendas, logotipos, marcas-d'água, caracteres aleatórios, placas legíveis nem elementos que imitem escrita.
+- Não adicionar títulos, labels, assinatura, OAB, número do slide, frações como 1/3 ou marcadores de sequência.
+- Não usar imagens de documentos reais, nomes, números de processo ou dados de clientes.
+- Não usar balança, martelo de juiz, pilha de livros jurídicos, aperto de mãos ou reunião de escritório como clichês automáticos; use-os somente quando forem diretamente relevantes à pauta.
+- Não sugerir vitória, indenização garantida ou resultado certo de processo.
+- Não reproduzir marcas ou identidade visual de terceiros.
+- Produza apenas a imagem final de fundo em alta qualidade, com foco nítido e sem texto. Não responda com explicações.
 """
-
 
 def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
     bg,ink,accent=palette
