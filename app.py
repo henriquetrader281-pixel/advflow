@@ -793,6 +793,42 @@ def validate_legal_with_three_ais(content, source_material):
             results.append({"provedor": name, "resultado": None, "erro": str(exc)[:350], "configurado": True})
     return results
 
+
+DEFAULT_TYPOGRAPHY = "Clássico imponente — Playfair Display + Montserrat"
+TYPOGRAPHY_SPECS = {
+    "Clássico imponente — Playfair Display + Montserrat": {
+        "title": "Playfair Display", "body": "Montserrat",
+        "description": "Títulos serifados expressivos e corpo limpo; melhor escolha inicial para autoridade clássica."
+    },
+    "Clássico editorial — Cormorant Garamond + Inter": {
+        "title": "Cormorant Garamond", "body": "Inter",
+        "description": "Mais editorial e literário, com corpo contemporâneo e legível."
+    },
+    "Contemporâneo refinado — Cinzel + Lato": {
+        "title": "Cinzel", "body": "Lato",
+        "description": "Título inspirado em inscrições clássicas e texto de leitura simples."
+    },
+    "Moderno limpo — Playfair Display + Open Sans": {
+        "title": "Playfair Display", "body": "Open Sans",
+        "description": "Equilíbrio entre personalidade no título e leitura funcional."
+    },
+}
+
+def typography_guidance(typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
+    spec = TYPOGRAPHY_SPECS.get(typography_name, TYPOGRAPHY_SPECS[DEFAULT_TYPOGRAPHY])
+    canvas = {"4:5": "1080 × 1350 px", "1:1": "1080 × 1080 px", "9:16": "1080 × 1920 px"}.get(aspect_ratio, "1080 × 1350 px")
+    return (
+        f"Par obrigatório: título em {spec['title']}; corpo e textos auxiliares em {spec['body']}. "
+        f"Formato: {aspect_ratio} ({canvas}). Em uma arte de 1080 px de largura, título de capa entre 60–80 px "
+        f"(equivalente aproximado a 45–60 pt no Canva), subtítulos entre 32–37 px, corpo de texto entre 24–29 px "
+        f"e assinatura/rodapé entre 16–19 px. Use negrito apenas para hierarquia, no máximo três níveis tipográficos, "
+        f"largura de linha confortável, entrelinha generosa, alto contraste e margens seguras. "
+        f"Se o texto exceder a capacidade, simplifique a copy sem alterar a regra jurídica ou peça revisão editorial; "
+        f"não reduza o corpo abaixo de 22 px, não aperte o espaçamento e não corte palavras. "
+        f"Deixe espaço negativo; capa com título curto e dominante; slides internos com uma ideia principal e poucas linhas. "
+        f"Sem emojis, ícones decorativos, texto fluorescente, caixa alta em parágrafos ou excesso de dourado."
+    )
+
 PALETTES={
     "Azul-marinho & champanhe":("#F5F1E8","#172842","#B79B61"),
     "Verde-pinho & marfim":("#F2F4EE","#183F38","#829C83"),
@@ -909,7 +945,7 @@ def _draw_icon(draw, kind, cx, cy, unit, ink, accent, light):
         line([(cx-u*.18,cy+u*.12),(cx+u*.10,cy+u*.12)],ink,max(3,w//2))
         line([(cx-u*.18,cy+u*.28),(cx+u*.18,cy+u*.28)],accent)
 
-def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None):
+def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None, typography=DEFAULT_TYPOGRAPHY):
     title = str(title or "").strip()
     body = str(body or "").strip()
     generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {slide_index}"}
@@ -921,12 +957,9 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
     im=Image.new("RGB",(1080,1350),bg_rgb); d=ImageDraw.Draw(im)
     for y in range(1350):
         t=y/1349; colour=_blend(bg_rgb,_blend(bg_rgb,accent_rgb,.18),t*.72); d.line((0,y,1080,y),fill=colour)
+    import imagem
     def font(sz,bold=False):
-        paths=(["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf","C:/Windows/Fonts/arialbd.ttf"] if bold else ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","C:/Windows/Fonts/arial.ttf"])
-        for path in paths:
-            try:return ImageFont.truetype(path,sz)
-            except Exception:pass
-        return ImageFont.load_default()
+        return imagem.font(sz, bold, typography, "title" if bold else "body")
     soft=_blend(bg_rgb,accent_rgb,.15); very_soft=_blend(bg_rgb,accent_rgb,.075)
     d.rectangle((0,0,1080,18),fill=accent_rgb); d.ellipse((650,-190,1230,390),fill=soft); d.ellipse((760,-95,1140,285),outline=accent_rgb,width=3)
     icon_kind=_topic_icon(area); stage_short=(funnel_stage.split("|")[0].strip() if "|" in funnel_stage else funnel_stage).upper()
@@ -944,16 +977,16 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         if len(lines)>max_lines:d.text((x,y),"…",font=ft,fill=color);y+=leading
         return y
     if slide_index==1:
-        y=wrapped(title,72,470,font(68 if len(str(title))<43 else 57,True),930,ink_rgb,78,4)
+        y=wrapped(title,72,470,font(78 if len(str(title))<43 else 64,True),930,ink_rgb,84,3)
         d.rounded_rectangle((72,y+12,280,y+19),radius=3,fill=accent_rgb)
-        wrapped(body,72,y+53,font(31),900,ink_rgb,43,8)
+        wrapped(body,72,y+53,font(29),900,ink_rgb,39,7)
     else:
         d.text((72,160),f"IDEIA {slide_index:02d} / {max(total_slides,1):02d}",font=font(19,True),fill=accent_rgb)
-        y=wrapped(title,72,208,font(58 if len(str(title))<42 else 49,True),910,ink_rgb,66,4)
+        y=wrapped(title,72,208,font(66 if len(str(title))<42 else 56,True),910,ink_rgb,72,3)
         d.rounded_rectangle((72,y+10,320,y+17),radius=3,fill=accent_rgb);y+=45
         d.rounded_rectangle((54,y-12,1025,1110),radius=26,outline=_blend(accent_rgb,bg_rgb,.55),width=2)
         d.ellipse((68,y+1,88,y+21),fill=accent_rgb)
-        wrapped(body,86,y+45,font(32),855,ink_rgb,45,13)
+        wrapped(body,86,y+45,font(28),855,ink_rgb,39,10)
     d.line((72,1204,1008,1204),fill=_blend(accent_rgb,bg_rgb,.36),width=2)
     d.text((72,1242),"Informação geral • confira as fontes e o contexto aplicável",font=font(17),fill=_blend(ink_rgb,bg_rgb,.2))
     d.text((935,1302),f"{slide_index:02d} / {max(total_slides,1):02d}",font=font(17,True),fill=accent_rgb)
@@ -964,7 +997,7 @@ def make_art(title, body, palette, signature="", area="Geral / interdisciplinar"
         except Exception:pass
     out=io.BytesIO();im.save(out,format="PNG",optimize=True);out.seek(0);return out
 
-def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium"):
+def build_gemini_full_piece_prompt(draft, fmt="Carrossel", audience="público geral", office="", oab="", palette_name="Identidade do escritório", visual_style="editorial premium", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
     """Separa copy textual, direção visual de imagem e instruções de vídeo para o Gemini."""
     slides = draft.get("slides") or []
     text_copy, image_copy = [], []
@@ -1017,6 +1050,8 @@ ENTREGA DESEJADA
 IDENTIDADE E DIREÇÃO VISUAL
 Paleta: {palette_name}
 Estilo visual: {visual_style}
+SISTEMA TIPOGRÁFICO OBRIGATÓRIO
+{typography_guidance(typography_name, aspect_ratio)}
 Não inclua nome de escritório, nome de advogado, número de OAB, assinatura ou dados institucionais no rodapé. Não invente placeholders como “Nome do escritório”, “OAB: UF 000000” ou equivalentes. Deixe o rodapé limpo; use apenas a numeração do slide quando necessária.
 Público-alvo: {audience}
 Área jurídica: {draft.get("area_direito", "Geral / interdisciplinar")}
@@ -1058,7 +1093,7 @@ REGRAS IMPORTANTES
 - Antes de concluir, confira fidelidade da copy, ortografia, margens e consistência entre as peças.
 """
 
-def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório"):
+def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides, office="", oab="", palette_name="Identidade do escritório", typography_name=DEFAULT_TYPOGRAPHY, aspect_ratio="4:5"):
     raw_title = str(slide.get("titulo", f"Slide {slide_number}")).strip()
     body = str(slide.get("texto", "")).strip()
     visual = str(slide.get("visual", "")).strip()
@@ -1072,11 +1107,12 @@ def build_gemini_carousel_slide_prompt(draft, slide, slide_number, total_slides,
     return f"""Gere SOMENTE UMA imagem final: SLIDE {slide_number} DE {total_slides} de um carrossel profissional para Instagram.
 
 FORMATO E COMPOSIÇÃO
-- Vertical 4:5, 1080 × 1350 pixels; uma arte individual, não uma página com várias miniaturas.
+- Proporção {aspect_ratio}; use 1080 × 1350 px para 4:5, 1080 × 1080 px para 1:1 e 1080 × 1920 px para 9:16. Uma arte individual, não uma página com várias miniaturas.
 - Não gerar o carrossel inteiro em uma imagem, nem grade, mosaico, storyboard ou colagem de slides.
 - Gere exatamente o slide {slide_number}; não substitua por outro slide.
 - Sistema visual consistente em todos os slides: {palette_name}; padrão editorial premium, iluminação sofisticada, materiais realistas e paleta consistente, mas com cena/metáfora visual específica para cada argumento.
 - Acabamento de revista profissional: high-end corporate editorial, sophisticated, trustworthy, calm authority, cinematic yet natural lighting, precise composition and ample safe margins.
+- SISTEMA TIPOGRÁFICO: {typography_guidance(typography_name, aspect_ratio)}
 - Mantenha todo o texto e os elementos importantes dentro da área segura. Não corte palavras, letras, rostos ou objetos.
 - Não inclua nome de escritório, nome de advogado, número de OAB, assinatura, logotipo fictício ou dados institucionais no rodapé. Nunca escreva “Nome do escritório”, “OAB: UF 000000” ou placeholders parecidos. Deixe o rodapé limpo; somente a numeração do slide pode aparecer, se necessária.
 
@@ -1156,7 +1192,7 @@ Acabamento de revista/editorial profissional; iluminação deliberada; profundid
 RESTRIÇÕES
 Não incluir texto, letras, palavras, números, legendas, logotipos ou marcas-d'água. Não usar balança da justiça, martelo de juiz, pilha de livros jurídicos, aperto de mãos, caneta assinando contrato ou pessoas numa reunião de escritório como padrão automático; só usar esses elementos quando forem diretamente relevantes à pauta. Não usar peças de quebra-cabeça com termos jurídicos como metáfora genérica. Não sugerir sucesso, vitória, indenização garantida ou resultado de processo por meio da imagem. Prefira uma situação concreta, objeto ou cena que comunique a dúvida específica do público. Não mostrar documentos reais, nomes, números de processo ou dados de clientes. Não copiar a identidade visual de terceiros. Produza apenas a imagem de fundo, sem tipografia, em alta qualidade."""
 
-def build_gemini_final_art_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5"):
+def build_gemini_final_art_prompt(title, body, area, audience, tone, style, palette_name, palette, visual_direction, visual_type="Cena editorial", density="Equilibrada", aspect_ratio="4:5", typography_name=DEFAULT_TYPOGRAPHY):
     """Prompt para o Gemini criar a peça completa, com a copy renderizada na própria imagem."""
     bg, ink, accent = palette
     style_words = {
@@ -1188,6 +1224,8 @@ The final image must already contain the supplied Portuguese headline and body t
 
 DESIGN DIRECTION
 Art direction: high-end corporate editorial, sophisticated, trustworthy, authoritative but calm, premium magazine quality, natural materials, cinematic yet controlled lighting, a coherent color system, elegant negative space, excellent typographic hierarchy.
+TYPOGRAPHIC SYSTEM — FOLLOW PRECISELY
+{typography_guidance(typography_name, aspect_ratio)}
 Selected style: {style_words.get(style, style)}.
 Composition type: {composition.get(visual_type, composition["Cena editorial"])}.
 Visual density: {density_words.get(density, density_words["Equilibrada"])}.
@@ -1275,7 +1313,7 @@ def _choose_enum_parameter(spec, preferred):
         return preferred[0] if preferred else None
     return None
 
-def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image=None, reference_mime="image/png"):
+def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image=None, reference_mime="image/png", aspect_ratio="4:5"):
     """Generate one image via OpenRouter's unified Image API; this endpoint can consume credits."""
     key=secret("OPENROUTER_API_KEY")
     if not key:
@@ -1287,7 +1325,7 @@ def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image
     payload={"model":model_id,"prompt":prompt}
     # Pass optional controls only when the live catalog advertises them.
     if "aspect_ratio" in params:
-        ratio=_choose_enum_parameter(params.get("aspect_ratio"),["4:5","3:4","2:3","9:16","1:1"])
+        ratio=_choose_enum_parameter(params.get("aspect_ratio"),[aspect_ratio,"4:5","1:1","9:16","3:4","2:3"])
         if ratio:
             payload["aspect_ratio"]=ratio
     else:
@@ -1301,7 +1339,7 @@ def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image
         }
         ratio_list=known_ratios.get(model_id)
         if ratio_list:
-            payload["aspect_ratio"]=ratio_list[0]
+            payload["aspect_ratio"]=aspect_ratio if aspect_ratio in ratio_list else ratio_list[0]
     if "resolution" in params:
         resolution=_choose_enum_parameter(params.get("resolution"),["2K","1K","4K","512"])
         if resolution:
@@ -1352,7 +1390,7 @@ def generate_openrouter_image(prompt, model_id, model_meta=None, reference_image
     }
 
 
-def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="Geral / interdisciplinar", slide_index=1, total_slides=1):
+def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="Geral / interdisciplinar", slide_index=1, total_slides=1, typography=DEFAULT_TYPOGRAPHY, output_height=1350):
     if not str(title or "").strip() or not str(body or "").strip():
         raise ValueError("Título ou texto da arte vazio. Gere ou preencha o conteúdo antes de finalizar a imagem.")
     import imagem
@@ -1364,9 +1402,9 @@ def compose_uploaded_art(image_bytes, title, body, palette, signature="", area="
     focus=imagem.autofoco(photo) or (.5,.4)
     rendered=imagem.render(
         {"titulo":str(title).strip(),"texto":str(body).strip(),"kicker":str(area or "Conteúdo informativo")},
-        max(0,int(slide_index)-1),max(1,int(total_slides)),1350,
+        max(0,int(slide_index)-1),max(1,int(total_slides)),int(output_height),
         (bg,ink,accent),signature,"",photo if int(slide_index)==1 else None,
-        None,focus,"Centro"
+        None,focus,"Centro",typography
     )
     out=io.BytesIO();rendered.save(out,format="PNG",optimize=True);out.seek(0);return out
 
