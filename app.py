@@ -1919,6 +1919,22 @@ with tabs[6]:
 
 with tabs[7]:
     st.subheader("Integrações e configuração")
+    st.markdown("### Estado do login")
+    if persistent_auth_enabled():
+        try:
+            stored_users = supabase_auth_request("GET", params={"select":"username", "limit":"1"})
+            st.success("Login persistente configurado: as contas são lidas do Supabase.")
+            if st.button("Verificar banco de login", key="test_persistent_login_store"):
+                try:
+                    users = persistent_auth_users_list()
+                    st.success(f"Conexão e tabela confirmadas. Contas cadastradas: {len(users)}.")
+                except Exception as exc:
+                    st.error("Falha ao verificar o banco persistente: " + str(exc))
+        except Exception as exc:
+            st.error("Supabase está configurado, mas o banco de login não respondeu: " + str(exc))
+    else:
+        st.warning("Login ainda usa SQLite local. Configure SUPABASE_URL e SUPABASE_SECRET_KEY para não perder as contas após reinícios/redeploys.")
+        st.markdown("Execute primeiro o arquivo [supabase/schema.sql no GitHub](https://github.com/henriquetrader281-pixel/advflow/blob/main/supabase/schema.sql) no SQL Editor do Supabase. Depois adicione a URL do projeto e a chave secreta em Streamlit Community Cloud → Settings → Secrets e reinicie o app.")
     st.markdown("- **Gemini:** configure GEMINI_API_KEY e um modelo ativo na sua conta; padrão sugerido no código: gemini-3.8-flash.")
     st.markdown("- **Alternativa Groq:** configure GROQ_API_KEY; o modelo padrão vem de GROQ_MODEL.")
     st.markdown("- **OpenRouter:** configure OPENROUTER_API_KEY em Secrets. O modelo padrão é openrouter/free; você pode alterá-lo em OPENROUTER_MODEL. Modelos gratuitos têm cotas e limites próprios.")
@@ -1932,8 +1948,8 @@ with tabs[7]:
             st.error("Falha no teste OpenRouter: "+str(exc))
     st.markdown("- **RSS:** feeds públicos configuráveis.")
     st.markdown("- **Instagram/Meta:** métricas são manuais; publicação, Insights e agendamento não estão conectados.")
-    st.markdown("- **Armazenamento:** SQLite local. No Streamlit Cloud, o disco local pode não ser persistente; configure banco externo para uso duradouro.")
-    st.markdown("- **Login:** primeiro acesso cria o administrador; ele cria contas na aba Usuários. Senhas recebem hash PBKDF2, cinco falhas bloqueiam o acesso por 15 minutos e cada conta vê apenas seus próprios dados.")
+    st.markdown("- **Armazenamento de conteúdo:** peças, métricas e calendário ainda usam SQLite local; migre esses dados para um banco persistente antes de depender deles em produção.")
+    st.markdown("- **Login:** se SUPABASE_URL e SUPABASE_SECRET_KEY estiverem configurados, as contas e hashes de senha ficam em public.advflow_users no Supabase. Caso contrário, o login usa SQLite local e pode ser perdido. Senhas usam PBKDF2, cinco falhas bloqueiam o acesso por 15 minutos e cada conta vê apenas os próprios dados.")
     st.markdown("- **Recuperação:** o administrador redefine a senha; o usuário recebe uma senha temporária e precisa trocá-la. Não há envio de e-mails nesta versão.")
     st.markdown("- **Segurança:** nunca coloque chaves de API nem senhas no GitHub. Configure chaves no painel Secrets do Streamlit.")
     st.markdown("- **Persistência:** o SQLite pode não sobreviver a reinícios/redeploys de algumas hospedagens. Configure banco persistente e backup antes de usar em produção.")
