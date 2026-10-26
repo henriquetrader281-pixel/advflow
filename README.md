@@ -52,7 +52,7 @@ Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignor
 
 Dentro da aba **Agente de conteúdo**, escolha **Copy profissional** no campo “Modo de criação” para produzir legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O modo reutiliza o tema, público, formato, área do Direito, tom e contexto do formulário principal. A peça resultante continua disponível na mesma tela para edição, revisão linguística e jurídica, salvamento e uso no estúdio visual. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
 
-Dentro da aba **Agente de conteúdo**, abra o expansor **Revisão OAB e conferência jurídica** para fazer uma triagem lexical preliminar de possíveis alertas na publicidade jurídica. Essa checagem ajuda a apontar expressões que merecem revisão, mas não certifica conformidade com as regras da OAB nem substitui a análise do profissional responsável.
+Dentro da aba **Agente de conteúdo**, abra o expansor **Revisão OAB — triagem ética** para fazer uma triagem lexical preliminar de possíveis alertas na publicidade jurídica. Essa checagem ajuda a apontar expressões que merecem revisão, mas não certifica conformidade com as regras da OAB nem substitui a análise do profissional responsável.
 
 Antes de publicar, confira o texto integral, o contexto e as regras oficiais vigentes. Use como referência o Provimento 205/2021 e o Código de Ética e Disciplina da OAB, sem tratar a triagem automática como parecer jurídico.
 
