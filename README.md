@@ -48,6 +48,14 @@ As senhas não são armazenadas em texto simples: a aplicação usa PBKDF2-HMAC-
 
 Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignore.
 
+## Copy profissional e validação jurídica por múltiplas IAs
+
+A aba **Copy profissional** cria legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
+
+Na aba **Revisão OAB**, a validação de fundamentos envia o mesmo conteúdo às integrações configuradas, compara referências e correções sugeridas e destaca divergências de status quando os modelos identificam a mesma referência. Para confrontar a redação de artigos, **cole o trecho relevante da fonte primária oficial** no campo próprio. Um link isolado não é tratado como se a página tivesse sido consultada.
+
+A comparação entre IAs é um mecanismo auxiliar de revisão, não uma prova de exatidão ou vigência. Os provedores podem usar modelos iguais ou diferentes. Confirme legislação, alterações e precedentes nas fontes oficiais e submeta a versão final à revisão do profissional responsável. As restrições editoriais seguem como referência o Provimento 205/2021 e o Código de Ética e Disciplina da OAB.
+
 ## OpenRouter como provedor alternativo
 
 O AdvFlow pode usar OpenRouter como terceiro provedor de texto, depois de Gemini e Groq e antes do rascunho local. O endpoint é compatível com a API de chat completions e o padrão sugerido é `openrouter/free`; modelos gratuitos têm disponibilidade e limites próprios.
