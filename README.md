@@ -2,6 +2,30 @@
 
 Aplicação Streamlit para produção de conteúdo informativo, arte tipográfica, métricas manuais, calendário editorial e monitoramento de notícias jurídicas.
 
+## Corrigir perda de acesso e manter o login persistente
+
+O login local em SQLite não é confiável em uma hospedagem cujo disco pode ser recriado. O AdvFlow agora pode guardar **apenas os registros de autenticação** em uma tabela persistente do Supabase; nome de usuário, hash e salt da senha, perfil, bloqueio por tentativas e estado da conta ficam no banco remoto.
+
+### Configuração obrigatória (uma vez)
+
+1. Crie ou abra seu projeto no [Supabase](https://supabase.com/dashboard).
+2. No repositório, abra `supabase/schema.sql`, copie o conteúdo e execute no **SQL Editor** do seu projeto. Isso cria a tabela privada `public.advflow_users`.
+3. No app hospedado pelo **Streamlit Community Cloud**, abra **Settings → Secrets** e configure:
+   
+   ```toml
+   SUPABASE_URL = "https://SEU_PROJECT_REF.supabase.co"
+   SUPABASE_SECRET_KEY = "SUA_CHAVE_SECRETA_DO_SUPABASE"
+   ```
+   
+   Use a chave secreta do Supabase somente em Secrets, nunca no GitHub, no navegador ou em mensagens. O código também aceita `SUPABASE_SERVICE_ROLE_KEY` para projetos que ainda usam a chave legada.
+4. Mantenha `INITIAL_SETUP_KEY` configurada, salve os Secrets e reinicie/republique o app.
+
+Quando o banco remoto estiver vazio, a aplicação tenta migrar automaticamente os hashes dos usuários que ainda existirem no SQLite local. **A senha original não é migrada nem precisa ser conhecida pelo aplicativo**: só são transferidos o salt e o hash já armazenados. Se a hospedagem já apagou o banco local, use a chave privada `INITIAL_SETUP_KEY` na tela inicial para criar novamente o primeiro administrador; depois, esse cadastro ficará no Supabase.
+
+Se o Supabase estiver configurado mas indisponível ou sem a tabela, o login falha de forma explícita em vez de criar silenciosamente uma conta em outro banco local.
+
+**Limite importante:** esta mudança torna persistente o cadastro/login de usuários. O conteúdo salvo, as métricas e o calendário ainda usam SQLite local nesta versão e podem exigir armazenamento persistente separado.
+
 ## Acesso e usuários
 
 - Antes de abrir o app à internet, configure INITIAL_SETUP_KEY em Streamlit Secrets com um valor longo e aleatório privado. Essa chave protege a criação do primeiro administrador e não é a senha normal de login.
@@ -10,6 +34,7 @@ Aplicação Streamlit para produção de conteúdo informativo, arte tipográfic
 - Senhas temporárias são geradas pela aplicação e precisam ser alteradas no primeiro acesso. O administrador pode redefinir ou desativar contas.
 - Cinco tentativas de senha incorreta bloqueiam o login por 15 minutos.
 - Esta versão não envia recuperação de senha por e-mail; solicite redefinição ao administrador.
+- Para não perder contas após uma nova implantação, configure o armazenamento de autenticação no Supabase seguindo a seção acima. Sem esses Secrets, o login permanece no SQLite local.
 
 As senhas não são armazenadas em texto simples: a aplicação usa PBKDF2-HMAC-SHA256 com salt individual. A autenticação básica não substitui um sistema corporativo com MFA, auditoria centralizada, políticas de sessão e armazenamento persistente.
 
