@@ -50,7 +50,7 @@ Não envie o arquivo secrets.toml real ao GitHub; ele é ignorado pelo .gitignor
 
 ## Copy profissional e validação jurídica por múltiplas IAs
 
-A aba **Copy profissional** cria legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
+Dentro da aba **Agente de conteúdo**, escolha **Copy profissional** no campo “Modo de criação” para produzir legendas, carrosséis, Reels, posts estáticos e artigos curtos com linguagem natural e sóbria, sem emojis por padrão, clickbait, urgência artificial, promessas de resultado ou chamadas de contratação. O modo reutiliza o tema, público, formato, área do Direito, tom e contexto do formulário principal. A peça resultante continua disponível na mesma tela para edição, revisão linguística e jurídica, salvamento e uso no estúdio visual. O módulo usa a primeira integração disponível entre Gemini, Groq e OpenRouter.
 
 Na aba **Revisão OAB**, a validação de fundamentos envia o mesmo conteúdo às integrações configuradas, compara referências e correções sugeridas e destaca divergências de status quando os modelos identificam a mesma referência. Para confrontar a redação de artigos, **cole o trecho relevante da fonte primária oficial** no campo próprio. Um link isolado não é tratado como se a página tivesse sido consultada.
 
