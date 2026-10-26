@@ -945,7 +945,7 @@ def _draw_icon(draw, kind, cx, cy, unit, ink, accent, light):
         line([(cx-u*.18,cy+u*.12),(cx+u*.10,cy+u*.12)],ink,max(3,w//2))
         line([(cx-u*.18,cy+u*.28),(cx+u*.18,cy+u*.28)],accent)
 
-def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None, typography=DEFAULT_TYPOGRAPHY):
+def make_art(title, body, palette, signature="", area="Geral / interdisciplinar", style="Editorial premium", slide_index=1, total_slides=1, funnel_stage="Descoberta", logo_bytes=None, typography=DEFAULT_TYPOGRAPHY, output_height=1350):
     title = str(title or "").strip()
     body = str(body or "").strip()
     generic_titles = {"gancho", "introdução", "introducao", "contexto", "explicação", "explicacao", "aplicação", "aplicacao", "conclusão", "conclusao", "fechamento", "síntese", "sintese", "slide", f"slide {slide_index}"}
@@ -1168,7 +1168,7 @@ def build_gemini_plus_prompt(title, body, area, audience, tone, style, palette_n
       "Equilibrada":"Um foco dominante e no máximo dois elementos de apoio claramente subordinados.",
       "Rica em detalhes":"Mais textura, cenário e elementos contextuais, mantendo um foco dominante e sem poluição visual."
     }
-    return f"""Create an original, premium editorial background for Brazilian legal communication. Aspect ratio {aspect_ratio}, vertical Instagram format, to be finished later in AdvFlow. Prefer precise visual storytelling over generic legal stock imagery.
+    return f"""Create an original, premium editorial background for Brazilian legal communication. Instagram format {aspect_ratio}, to be finished later in AdvFlow. Prefer precise visual storytelling over generic legal stock imagery.
 
 ART DIRECTION
 Use these visual keywords as style guidance: high-end corporate editorial, sophisticated, trustworthy, authoritative but calm, photorealistic or carefully art-directed according to the selected style, cinematic lighting, natural materials, strong visual hierarchy, elegant negative space, subtle gold accents only when compatible with the selected palette. Build the scene around the specific argument of this slide, not around a generic idea of “law”.
@@ -1222,7 +1222,7 @@ def build_gemini_final_art_prompt(title, body, area, audience, tone, style, pale
         "Rica em detalhes": "rich material texture and contextual detail, while preserving a calm hierarchy and ample legibility"
     }
     return f"""Create ONE COMPLETE, FINISHED Instagram artwork — NOT a background-only image and NOT a text-free image.
-Canvas: vertical {aspect_ratio}, preferably 1080 × 1350 pixels for a 4:5 Instagram carousel slide.
+Canvas: {aspect_ratio}; use 1080 × 1350 px for 4:5, 1080 × 1080 px for 1:1, and 1080 × 1920 px for 9:16.
 The final image must already contain the supplied Portuguese headline and body text, accurately typeset and integrated into the design. The user should not need to add the copy in another editor.
 
 DESIGN DIRECTION
