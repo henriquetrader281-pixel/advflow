@@ -603,11 +603,26 @@ def test_openrouter_connection():
         raise RuntimeError("OpenRouter respondeu, mas não retornou choices.")
     return model
 
+
+EMOJI_PATTERN = re.compile(r"[\U0001F1E6-\U0001F1FF\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0E\uFE0F\u200D\u20E3]")
+
+def strip_emojis_deep(value):
+    """Remove emojis das strings geradas sem alterar a estrutura dos objetos JSON."""
+    if isinstance(value, str):
+        return EMOJI_PATTERN.sub("", value)
+    if isinstance(value, list):
+        return [strip_emojis_deep(item) for item in value]
+    if isinstance(value, dict):
+        return {key: strip_emojis_deep(item) for key, item in value.items()}
+    return value
+
 def generate(subject, fmt, audience, goal, details="", area="Geral / interdisciplinar", funnel_stage=FUNNEL_STAGES[0], tone=TONE_OPTIONS[0], angle=ANGLE_OPTIONS[0], requested_cta=CTA_OPTIONS[0]):
     brief=json.dumps({"assunto":subject,"area_do_direito":area,"publico_segmentado":audience,"formato":fmt,"objetivo_editorial":goal,"etapa_do_funil":funnel_stage,"tom_de_voz":tone,"angulo_editorial":angle,"preferencia_de_cta_educativa":requested_cta,"paleta_visual":st.session_state.get("palette_choice","Azul-marinho e dourado"),"contexto_fontes_e_restricoes":details},ensure_ascii=False)
     errors=[]
     for name,fn in [("Gemini",call_gemini),("Groq (alternativo)",call_groq),("OpenRouter (alternativo)",call_openrouter)]:
-        try: return fn("Crie a peça a partir deste briefing. Não invente referências jurídicas. "+brief),name
+        try:
+            result = fn("Crie a peça a partir deste briefing. Não invente referências jurídicas. "+brief)
+            return strip_emojis_deep(result), name
         except Exception as e: errors.append(name+": "+str(e))
     result=local_draft(subject,fmt,audience,goal,area,funnel_stage,tone,angle,requested_cta,details)
     result["aviso"]="IA externa indisponível; estrutura local usada. "+" | ".join(errors)
@@ -738,6 +753,7 @@ def generate_professional_copy(subject, audience, fmt, area, objective, tone, de
             result = fn(prompt, system_prompt=COPYWRITER_SYSTEM)
             if not isinstance(result, dict) or not str(result.get("copy_principal", "")).strip():
                 raise ValueError("A resposta não trouxe copy_principal.")
+            result = strip_emojis_deep(result)
             result["_provedor_copy"] = name
             return result, name
         except Exception as exc:
